@@ -4,8 +4,9 @@
 --   * CanTouch = false on everything except Handle
 --   * every part welded to Handle with a WeldConstraint (legacy Welds replaced, offsets kept)
 --   * Grip is rotation only: the Handle (already on the shaft, near its bottom end) stays
---     centred in the hand, and the shaft points forward and ~35 degrees up with the
---     crescent head out in front ("ready to dig"), clear of the legs, head and ground
+--     centred in the hand, and the shaft stands straight up (90 degrees), clear of the
+--     legs, head and ground
+--   * Handle is invisible (it was a half-transparent red cube showing in the hand)
 --   * CanBeDropped = false (the Pickaxe lives in hotbar slot 1)
 -- The server also re-applies the physics rules at runtime (InventoryService + HeldPhysics).
 
@@ -17,8 +18,8 @@ assert(handle and handle:IsA("BasePart"), "Pickaxe has no Handle")
 local GRIP = CFrame.new(
 	0, 0, 0,
 	0.996842622756958, -0.0028636548668146133, -0.07935161143541336,
-	-0.06083762273192406, 0.6146564483642578, -0.7864454388618469,
-	0.051026105880737305, 0.7887897491455078, 0.6125415563583374
+	0.0069031077437102795, 0.998691201210022, 0.0506780706346035,
+	0.07910263538360596, -0.051065847277641296, 0.9955577254295349
 )
 
 -- Replace legacy joints to Handle with WeldConstraints, keeping each part where it is.
@@ -64,5 +65,6 @@ end
 
 tool.Grip = GRIP
 tool.CanBeDropped = false
+handle.Transparency = 1
 
 return "Pickaxe fixed: " .. table.concat(report, ", ")
