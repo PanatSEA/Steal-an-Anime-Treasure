@@ -1,7 +1,8 @@
 -- TreasureServer: core loop.
--- Dig (hold E) -> carry treasure above head -> boss wakes and chases with
--- telegraphed skills -> reach YOUR base plot in the SAFE ZONE to bank it.
--- Banked treasures pay income and can be sold (PlotService).
+-- Dig (hold E) -> server rolls the chest rarity -> carry it above your head ->
+-- boss wakes and chases with telegraphed skills -> reach YOUR plot in the SAFE
+-- ZONE -> it becomes a chest that unlocks, opens into a character and earns Cash
+-- (PlotService). Cash, characters and chests are saved (PlayerData).
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,7 +11,10 @@ local AnimeConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChil
 local Zones = require(script.Parent.Zones)
 local Carry = require(script.Parent.Carry)
 local Sfx = require(script.Parent.Sfx)
+local Roll = require(script.Parent.Roll)
 local BossController = require(script.Parent.BossController)
+local PlayerData = require(script.Parent.PlayerData)
+local InventoryService = require(script.Parent.InventoryService)
 local PlotService = require(script.Parent.PlotService)
 
 local World = AnimeConfig.World
@@ -26,11 +30,12 @@ end
 
 local DELIVERY_TICK = 0.2
 
--- [Player] = { Site = site, Part = BasePart }
+-- [Player] = { Site = site, Part = BasePart, Rarity = string }
 local carrying = {}
 
 PlotService.Init()
-PlotService.StartIncome()
+PlotService.Start()
+PlayerData.StartAutosave()
 
 local function setSiteAvailable(site, available)
 	site.Available = available
@@ -45,15 +50,16 @@ local function releaseTreasure(player, reason)
 	end
 	carrying[player] = nil
 	player:SetAttribute("CarryingTreasure", nil)
+	player:SetAttribute("CarryingRarity", nil)
 	if entry.Part then
 		entry.Part:Destroy()
 	end
-	print(("[TreasureGame] %s %s: %s"):format(player.Name, reason, entry.Site.Config.TreasureName))
+	print(("[TreasureGame] %s %s: %s [%s]"):format(player.Name, reason, entry.Site.Config.TreasureName, entry.Rarity))
 end
 
 local function deliver(player)
 	local entry = carrying[player]
-	if entry and PlotService.TryBank(player, entry.Site.Config) then
+	if entry and PlotService.AddChest(player, entry.Site.Config.BossId, entry.Rarity) then
 		releaseTreasure(player, "banked")
 	end
 end
@@ -76,9 +82,11 @@ local function setupSite(model)
 	prompt.MaxActivationDistance = 12
 	prompt.Parent = mound
 
+	-- The mound shows a neutral treasure; the rarity is only rolled when a dig completes.
 	local display = Carry.MakeTreasure(cfg)
 	display.Anchored = true
 	display.CFrame = mound.CFrame * CFrame.new(0, mound.Size.Y / 2 + display.Size.Y / 2 + 0.2, 0)
+	display:FindFirstChildOfClass("BillboardGui"):FindFirstChildOfClass("TextLabel").Text = cfg.TreasureName
 
 	local site = { Model = model, Config = cfg, Prompt = prompt, Display = display, Available = false }
 
@@ -109,16 +117,18 @@ local function setupSite(model)
 			return
 		end
 
-		local treasure = Carry.MakeTreasure(cfg)
+		local rarity = Roll.Rarity(cfg.RarityWeights) -- server-side roll at dig time
+		local treasure = Carry.MakeTreasure(cfg, rarity)
 		if not Carry.AttachToCharacter(character, treasure) then
 			treasure:Destroy()
 			return
 		end
 		setSiteAvailable(site, false)
-		carrying[player] = { Site = site, Part = treasure }
+		carrying[player] = { Site = site, Part = treasure, Rarity = rarity }
 		player:SetAttribute("CarryingTreasure", cfg.BossId)
+		player:SetAttribute("CarryingRarity", rarity)
 		Sfx.Play(cfg.DigSoundId, mound)
-		print(("[TreasureGame] %s dug %s — %s wakes up!"):format(player.Name, cfg.TreasureName, cfg.DisplayName))
+		print(("[TreasureGame] %s dug a %s %s — %s wakes up!"):format(player.Name, rarity, cfg.TreasureName, cfg.DisplayName))
 		site.Boss:Wake(player)
 	end)
 end
@@ -137,25 +147,16 @@ local function onCharacterAdded(player, character)
 end
 
 local function addStat(leaderstats, name, value)
-	if not leaderstats:FindFirstChild(name) then
-		local stat = Instance.new("IntValue")
+	local stat = leaderstats:FindFirstChild(name)
+	if not stat then
+		stat = Instance.new("IntValue")
 		stat.Name = name
-		stat.Value = value
 		stat.Parent = leaderstats
 	end
+	stat.Value = value
 end
 
 local function onPlayerAdded(player)
-	local leaderstats = player:FindFirstChild("leaderstats")
-	if not leaderstats then
-		leaderstats = Instance.new("Folder")
-		leaderstats.Name = "leaderstats"
-		leaderstats.Parent = player
-	end
-	addStat(leaderstats, "Cash", AnimeConfig.Economy.StartingCash)
-	addStat(leaderstats, "Treasures", 0) -- treasures banked on your plot right now
-	PlotService.Assign(player)
-
 	player.CharacterAdded:Connect(function(character)
 		onCharacterAdded(player, character)
 	end)
@@ -163,8 +164,26 @@ local function onPlayerAdded(player)
 		releaseTreasure(player, "dropped (respawned)")
 	end)
 	if player.Character then
-		onCharacterAdded(player, player.Character)
+		task.spawn(onCharacterAdded, player, player.Character)
 	end
+
+	local data = PlayerData.Load(player) -- yields
+	if player.Parent ~= Players then
+		PlayerData.Release(player)
+		return
+	end
+
+	local leaderstats = player:FindFirstChild("leaderstats")
+	if not leaderstats then
+		leaderstats = Instance.new("Folder")
+		leaderstats.Name = "leaderstats"
+		leaderstats.Parent = player
+	end
+	addStat(leaderstats, "Cash", data.Cash)
+	addStat(leaderstats, "Characters", #data.Characters)
+
+	PlotService.Assign(player)
+	InventoryService.Push(player)
 end
 
 for _, player in ipairs(Players:GetPlayers()) do
@@ -174,9 +193,11 @@ Players.PlayerAdded:Connect(onPlayerAdded)
 Players.PlayerRemoving:Connect(function(player)
 	releaseTreasure(player, "dropped (left)")
 	PlotService.Release(player)
+	InventoryService.Forget(player)
+	PlayerData.Release(player)
 end)
 
--- Only your own plot banks the treasure.
+-- Only your own plot accepts the treasure.
 task.spawn(function()
 	while true do
 		for player, _ in pairs(carrying) do

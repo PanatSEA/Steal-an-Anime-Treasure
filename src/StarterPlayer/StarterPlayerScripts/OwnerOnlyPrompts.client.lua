@@ -1,5 +1,5 @@
--- OwnerOnlyPrompts: hides "Sell" prompts on other players' plots.
--- The server still checks ownership; this only keeps other players' prompts off screen.
+-- OwnerOnlyPrompts: shows chest "Open" prompts only to the plot owner, and only
+-- once the chest is unlocked (Ready). The server still checks both before opening.
 local Players = game:GetService("Players")
 local CollectionService = game:GetService("CollectionService")
 
@@ -12,9 +12,11 @@ local function apply(prompt)
 	end
 	local function update()
 		prompt.Enabled = prompt:GetAttribute("OwnerUserId") == localPlayer.UserId
+			and prompt:GetAttribute("Ready") ~= false
 	end
 	update()
 	prompt:GetAttributeChangedSignal("OwnerUserId"):Connect(update)
+	prompt:GetAttributeChangedSignal("Ready"):Connect(update)
 end
 
 for _, prompt in ipairs(CollectionService:GetTagged(TAG)) do

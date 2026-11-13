@@ -7,6 +7,7 @@ local AnimeConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChil
 local Zones = require(script.Parent.Zones)
 local SkillPatterns = require(script.Parent.SkillPatterns)
 local Sfx = require(script.Parent.Sfx)
+local ModelLoader = require(script.Parent.ModelLoader)
 
 local BossController = {}
 BossController.__index = BossController
@@ -14,7 +15,6 @@ BossController.__index = BossController
 local CHASE_TICK = 0.15
 local RETURN_TICK = 0.25
 local FIRST_SKILL_DELAY = 1
-local GREYBOX_COLOR = Color3.fromRGB(163, 162, 165)
 
 local STATE_TEXT = {
 	Sleeping = "Zzz... Sleeping",
@@ -22,20 +22,9 @@ local STATE_TEXT = {
 	Returning = "Returning...",
 }
 
--- Grey-box boss. TODO: swap for the real model once cfg.BossModelName is set.
-local function buildPlaceholderModel(cfg)
-	local description = Instance.new("HumanoidDescription")
-	for _, key in ipairs({ "HeadColor", "TorsoColor", "LeftArmColor", "RightArmColor", "LeftLegColor", "RightLegColor" }) do
-		description[key] = GREYBOX_COLOR
-	end
-	description.HeightScale = 1.4
-	description.WidthScale = 1.4
-	description.DepthScale = 1.4
-	description.HeadScale = 1.3
-
-	local model = Players:CreateHumanoidModelFromDescription(description, Enum.HumanoidRigType.R15)
-	model.Name = cfg.BossId
-	model.PrimaryPart = model:FindFirstChild("HumanoidRootPart")
+-- Loads ReplicatedStorage.Models.Bosses.<BossId>, or a grey-box rig if it's missing.
+local function buildBossModel(cfg)
+	local model = ModelLoader.Boss(cfg.BossId)
 
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
@@ -44,7 +33,7 @@ local function buildPlaceholderModel(cfg)
 	humanoid.Health = math.huge
 	humanoid.WalkSpeed = cfg.WalkSpeed
 
-	local head = model:FindFirstChild("Head")
+	local head = model:FindFirstChild("Head") or model.PrimaryPart
 	local billboard = Instance.new("BillboardGui")
 	billboard.Size = UDim2.fromOffset(240, 56)
 	billboard.StudsOffset = Vector3.new(0, 3.5, 0)
@@ -81,7 +70,7 @@ function BossController.new(site, cfg, callbacks)
 	self.Config = cfg
 	self.Callbacks = callbacks
 	self.SpawnPart = site:WaitForChild("BossSpawn")
-	self.Model, self.Humanoid, self.StateLabel = buildPlaceholderModel(cfg)
+	self.Model, self.Humanoid, self.StateLabel = buildBossModel(cfg)
 	self.Root = self.Model.PrimaryPart
 	self.Model.Parent = site
 	self:Sleep()

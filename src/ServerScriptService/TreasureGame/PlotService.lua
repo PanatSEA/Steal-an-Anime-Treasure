@@ -1,5 +1,11 @@
--- PlotService: plot ownership, banked treasure slots, income and selling (Phase 3).
--- Session only: a player's plot, banked treasures and Cash reset when they leave.
+-- PlotService: plot ownership, chests and characters on plots, income (Phase 3b).
+--   * Each player gets the first free plot on join.
+--   * Banked treasure becomes a chest of its rolled rarity. It unlocks after
+--     UnlockTimeSeconds (counted from os.time(), so it keeps counting offline),
+--     then the owner holds E for OpenTimeSeconds to open it.
+--   * Opening picks a character of that rarity (server roll). Up to
+--     PlotCharacterSlots stand on the plot and earn income; the rest go to the
+--     inventory (storage only).
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -7,19 +13,33 @@ local CollectionService = game:GetService("CollectionService")
 
 local AnimeConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("AnimeConfig"))
 local Carry = require(script.Parent.Carry)
+local ModelLoader = require(script.Parent.ModelLoader)
+local Roll = require(script.Parent.Roll)
+local PlayerData = require(script.Parent.PlayerData)
+local InventoryService = require(script.Parent.InventoryService)
 
 local World = AnimeConfig.World
 local Economy = AnimeConfig.Economy
 
-local OWNER_ONLY_TAG = "OwnerOnlyPrompt" -- client hides these prompts from non-owners
-local SLOT_COLUMNS = 4
-local SLOT_SPACING = Vector2.new(10, 20)
-local FLASH_SECONDS = 2
+local OWNER_ONLY_TAG = "OwnerOnlyPrompt" -- client shows these only to the owner (and only when Ready)
+local TIMER_TICK = 0.5
+
+-- Plot layout in the plot's local space (plot is 47 x 54 studs).
+local CHARACTER_COLUMNS = 4
+local CHARACTER_SPACING = Vector2.new(10, 10)
+local CHARACTER_ROW_Z = -18 -- first character row, back half of the plot
+local CHEST_COLUMNS = 5
+local CHEST_ROWS_PER_LAYER = 3
+local CHEST_SPACING = Vector2.new(8, 7)
+local CHEST_ROW_Z = 6 -- first chest row, front half of the plot
+local CHEST_LAYER_HEIGHT = 2.2
 
 local PlotService = {}
 
-local plots = {} -- ordered { Folder, Part, Owner, Slots = {}, Sign, FlashToken }
+local plots = {} -- ordered { Folder, Part, Owner, Sign, Chests = {[id] = view}, Characters = {[id] = model} }
 local plotByPlayer = {}
+
+-- Helpers ------------------------------------------------------------------
 
 local function setStat(player, name, value)
 	local leaderstats = player:FindFirstChild("leaderstats")
@@ -29,60 +49,62 @@ local function setStat(player, name, value)
 	end
 end
 
-local function addCash(player, amount)
-	local leaderstats = player:FindFirstChild("leaderstats")
-	local cash = leaderstats and leaderstats:FindFirstChild("Cash")
-	if cash then
-		cash.Value += amount
-	end
+local function plotTop(plot)
+	return plot.Part.Size.Y / 2
 end
 
-local function countSlots(plot)
+local function countPlotCharacters(data)
 	local count = 0
-	for i = 1, Economy.PlotSlots do
-		if plot.Slots[i] then
+	for _, entry in ipairs(data.Characters) do
+		if entry.Location == "Plot" then
 			count += 1
 		end
 	end
 	return count
 end
 
-local function refreshSign(plot)
-	if plot.Owner then
-		plot.Sign.Text = ("%s's Plot  %d/%d"):format(plot.Owner.DisplayName, countSlots(plot), Economy.PlotSlots)
-		setStat(plot.Owner, "Treasures", countSlots(plot))
-	else
-		plot.Sign.Text = "Free Plot"
-	end
-end
-
-local function flashSign(plot, text)
-	local token = {}
-	plot.FlashToken = token
-	plot.Sign.Text = text
-	task.delay(FLASH_SECONDS, function()
-		if plot.FlashToken == token then
-			plot.FlashToken = nil
-			refreshSign(plot)
+local function freePlotSlot(data)
+	local used = {}
+	for _, entry in ipairs(data.Characters) do
+		if entry.Location == "Plot" and entry.Slot then
+			used[entry.Slot] = true
 		end
-	end)
+	end
+	for slot = 1, Economy.PlotCharacterSlots do
+		if not used[slot] then
+			return slot
+		end
+	end
+	return nil
 end
 
-local function slotOffset(index)
-	local rows = math.ceil(Economy.PlotSlots / SLOT_COLUMNS)
-	local col = (index - 1) % SLOT_COLUMNS
-	local row = math.floor((index - 1) / SLOT_COLUMNS)
-	local x = (col - (SLOT_COLUMNS - 1) / 2) * SLOT_SPACING.X
-	local z = (row - (rows - 1) / 2) * SLOT_SPACING.Y
-	return x, z
+local function refresh(plot)
+	local player = plot.Owner
+	if not player then
+		plot.Sign.Text = "Free Plot"
+		return
+	end
+	local data = PlayerData.Get(player)
+	if not data then
+		return
+	end
+	plot.Sign.Text = ("%s's Plot  %d/%d  |  %d chest%s"):format(
+		player.DisplayName,
+		countPlotCharacters(data),
+		Economy.PlotCharacterSlots,
+		#data.Chests,
+		#data.Chests == 1 and "" or "s"
+	)
+	setStat(player, "Characters", #data.Characters)
+	setStat(player, "Cash", data.Cash)
 end
 
 local function makeSign(part)
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "PlotSign"
-	billboard.Size = UDim2.fromOffset(280, 44)
-	billboard.StudsOffset = Vector3.new(0, 9, 0)
-	billboard.MaxDistance = 200
+	billboard.Size = UDim2.fromOffset(320, 44)
+	billboard.StudsOffset = Vector3.new(0, 10, 0)
+	billboard.MaxDistance = 220
 	billboard.Parent = part
 
 	local label = Instance.new("TextLabel")
@@ -95,6 +117,186 @@ local function makeSign(part)
 	label.Parent = billboard
 	return label
 end
+
+local function formatTime(seconds)
+	seconds = math.max(0, math.ceil(seconds))
+	return ("%d:%02d"):format(seconds // 60, seconds % 60)
+end
+
+-- Characters ----------------------------------------------------------------
+
+local function characterCFrame(plot, slot)
+	local col = (slot - 1) % CHARACTER_COLUMNS
+	local row = (slot - 1) // CHARACTER_COLUMNS
+	local x = (col - (CHARACTER_COLUMNS - 1) / 2) * CHARACTER_SPACING.X
+	local z = CHARACTER_ROW_Z + row * CHARACTER_SPACING.Y
+	return plot.Part.CFrame * CFrame.new(x, plotTop(plot), z)
+end
+
+local function addCharacterLabel(model, entry)
+	local anchor = model:FindFirstChild("Head") or model.PrimaryPart
+	local rarity = AnimeConfig.Rarities[entry.Rarity]
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "CharacterLabel"
+	billboard.Size = UDim2.fromOffset(180, 48)
+	billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+	billboard.MaxDistance = 80
+	billboard.Parent = anchor
+
+	local name = Instance.new("TextLabel")
+	name.Size = UDim2.fromScale(1, 0.55)
+	name.BackgroundTransparency = 1
+	name.Font = Enum.Font.GothamBlack
+	name.TextScaled = true
+	name.TextColor3 = rarity.Color
+	name.TextStrokeTransparency = 0.2
+	name.Text = ("%s [%s]"):format(AnimeConfig.GetCharacterName(entry), entry.Rarity)
+	name.Parent = billboard
+
+	local income = Instance.new("TextLabel")
+	income.Size = UDim2.fromScale(1, 0.45)
+	income.Position = UDim2.fromScale(0, 0.55)
+	income.BackgroundTransparency = 1
+	income.Font = Enum.Font.GothamBold
+	income.TextScaled = true
+	income.TextColor3 = Color3.fromRGB(120, 255, 140)
+	income.TextStrokeTransparency = 0.2
+	income.Text = ("+%d Cash/s"):format(entry.IncomePerSecond)
+	income.Parent = billboard
+end
+
+local function spawnCharacter(plot, owned)
+	local entry, seriesId = AnimeConfig.GetCharacter(owned.CharacterId)
+	local model = ModelLoader.Character(seriesId, entry.CharacterId)
+	addCharacterLabel(model, entry)
+
+	-- Stand the model on the plot: pivot to the slot, then lift so its bottom touches the top.
+	model:PivotTo(characterCFrame(plot, owned.Slot))
+	local boxCFrame, boxSize = model:GetBoundingBox()
+	local bottom = boxCFrame.Position.Y - boxSize.Y / 2
+	local target = (plot.Part.CFrame * CFrame.new(0, plotTop(plot), 0)).Position.Y
+	model:PivotTo(model:GetPivot() + Vector3.new(0, target - bottom, 0))
+
+	model.Parent = plot.Folder
+	plot.Characters[owned.Id] = model
+end
+
+-- Chests --------------------------------------------------------------------
+
+local function chestCFrame(plot, index, part)
+	local perLayer = CHEST_COLUMNS * CHEST_ROWS_PER_LAYER
+	local layer = (index - 1) // perLayer
+	local inLayer = (index - 1) % perLayer
+	local col = inLayer % CHEST_COLUMNS
+	local row = inLayer // CHEST_COLUMNS
+	local x = (col - (CHEST_COLUMNS - 1) / 2) * CHEST_SPACING.X
+	local z = CHEST_ROW_Z + row * CHEST_SPACING.Y
+	local y = plotTop(plot) + part.Size.Y / 2 + 0.2 + layer * CHEST_LAYER_HEIGHT
+	return plot.Part.CFrame * CFrame.new(x, y, z)
+end
+
+local function layoutChests(plot, data)
+	for index, chest in ipairs(data.Chests) do
+		local view = plot.Chests[chest.Id]
+		if view then
+			view.Part.CFrame = chestCFrame(plot, index, view.Part)
+		end
+	end
+end
+
+local openChest -- forward declaration
+
+local function spawnChest(plot, player, chest)
+	local boss = AnimeConfig.GetBoss(chest.BossId)
+	local part = Carry.MakeTreasure(boss, chest.Rarity)
+	part.Name = "Chest_" .. chest.Rarity
+	part.Anchored = true
+	local label = part:FindFirstChildOfClass("BillboardGui"):FindFirstChildOfClass("TextLabel")
+	label.Parent.Size = UDim2.fromOffset(200, 40)
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "Open"
+	prompt.ObjectText = chest.Rarity .. " Chest"
+	prompt.KeyboardKeyCode = Enum.KeyCode[boss.OpenKey] or Enum.KeyCode.E
+	prompt.HoldDuration = boss.OpenTimeSeconds
+	prompt.RequiresLineOfSight = false
+	prompt.MaxActivationDistance = 8
+	prompt:SetAttribute("OwnerUserId", player.UserId)
+	prompt:SetAttribute("Ready", false)
+	CollectionService:AddTag(prompt, OWNER_ONLY_TAG)
+	prompt.Parent = part
+	prompt.Triggered:Connect(function(triggeredBy)
+		if triggeredBy == player then
+			openChest(player, chest.Id)
+		end
+	end)
+
+	part.Parent = plot.Folder
+	plot.Chests[chest.Id] = { Part = part, Label = label, Prompt = prompt, Chest = chest }
+end
+
+local function updateChestTimers(plot)
+	local now = os.time()
+	for _, view in pairs(plot.Chests) do
+		local remaining = view.Chest.UnlockAt - now
+		local ready = remaining <= 0
+		view.Label.Text = ready
+			and ("%s Chest\nReady! Hold %s"):format(view.Chest.Rarity, AnimeConfig.GetBoss(view.Chest.BossId).OpenKey)
+			or ("%s Chest\n%s"):format(view.Chest.Rarity, formatTime(remaining))
+		if view.Prompt:GetAttribute("Ready") ~= ready then
+			view.Prompt:SetAttribute("Ready", ready)
+		end
+	end
+end
+
+openChest = function(player, chestId)
+	local plot = plotByPlayer[player]
+	local data = PlayerData.Get(player)
+	if not plot or not data then
+		return
+	end
+	local index, chest
+	for i, candidate in ipairs(data.Chests) do
+		if candidate.Id == chestId then
+			index, chest = i, candidate
+			break
+		end
+	end
+	if not chest or os.time() < chest.UnlockAt then
+		return -- unknown chest or still locked: the server decides, not the client
+	end
+
+	table.remove(data.Chests, index)
+	local view = plot.Chests[chestId]
+	if view then
+		view.Part:Destroy()
+		plot.Chests[chestId] = nil
+	end
+
+	local boss = AnimeConfig.GetBoss(chest.BossId)
+	local picked = Roll.Character(boss.OpensInto, chest.Rarity)
+	local slot = freePlotSlot(data)
+	local owned = {
+		Id = PlayerData.NewId(),
+		CharacterId = picked.CharacterId,
+		Location = slot and "Plot" or "Inventory",
+		Slot = slot,
+		AcquiredAt = os.time(),
+	}
+	table.insert(data.Characters, owned)
+
+	if slot then
+		spawnCharacter(plot, owned)
+	else
+		InventoryService.Push(player)
+	end
+	layoutChests(plot, data)
+	refresh(plot)
+	print(("[TreasureGame] %s opened a %s chest: %s -> %s"):format(
+		player.Name, chest.Rarity, picked.CharacterId, owned.Location))
+end
+
+-- Public API ------------------------------------------------------------------
 
 local function plotNumber(folder)
 	return tonumber(folder.Name:match("%d+")) or math.huge
@@ -122,27 +324,74 @@ function PlotService.Init()
 		if old then
 			old:Destroy()
 		end
-		local plot = { Folder = folder, Part = part, Owner = nil, Slots = {}, Sign = makeSign(part) }
+		local plot = { Folder = folder, Part = part, Owner = nil, Sign = makeSign(part), Chests = {}, Characters = {} }
 		table.insert(plots, plot)
-		refreshSign(plot)
+		refresh(plot)
 	end
 end
 
+-- Gives the player a plot and builds it from their loaded data.
 function PlotService.Assign(player)
 	if plotByPlayer[player] then
 		return plotByPlayer[player]
 	end
-	for _, plot in ipairs(plots) do
-		if not plot.Owner then
-			plot.Owner = player
-			plot.Folder:SetAttribute("OwnerUserId", player.UserId)
-			plotByPlayer[player] = plot
-			refreshSign(plot)
-			return plot
+	local data = PlayerData.Get(player)
+	local plot
+	for _, candidate in ipairs(plots) do
+		if not candidate.Owner then
+			plot = candidate
+			break
 		end
 	end
-	warn(("[TreasureGame] No free plot for %s (all %d taken)"):format(player.Name, #plots))
-	return nil
+	if not plot or not data then
+		warn(("[TreasureGame] No free plot for %s (all %d taken)"):format(player.Name, #plots))
+		return nil
+	end
+	plot.Owner = player
+	plot.Folder:SetAttribute("OwnerUserId", player.UserId)
+	plotByPlayer[player] = plot
+
+	-- Plot characters need a unique slot within range. Pass 1 keeps valid slots,
+	-- pass 2 re-slots the rest, and anything that still doesn't fit goes to the inventory.
+	local taken, needsSlot = {}, {}
+	for _, owned in ipairs(data.Characters) do
+		if owned.Location == "Plot" then
+			local slot = owned.Slot
+			if type(slot) == "number" and slot >= 1 and slot <= Economy.PlotCharacterSlots and not taken[slot] then
+				taken[slot] = true
+			else
+				table.insert(needsSlot, owned)
+			end
+		end
+	end
+	for _, owned in ipairs(needsSlot) do
+		local free
+		for slot = 1, Economy.PlotCharacterSlots do
+			if not taken[slot] then
+				free = slot
+				break
+			end
+		end
+		if free then
+			owned.Slot = free
+			taken[free] = true
+		else
+			owned.Location = "Inventory"
+			owned.Slot = nil
+		end
+	end
+	for _, owned in ipairs(data.Characters) do
+		if owned.Location == "Plot" then
+			spawnCharacter(plot, owned)
+		end
+	end
+	for _, chest in ipairs(data.Chests) do
+		spawnChest(plot, player, chest)
+	end
+	layoutChests(plot, data)
+	updateChestTimers(plot)
+	refresh(plot)
+	return plot
 end
 
 function PlotService.Release(player)
@@ -151,17 +400,17 @@ function PlotService.Release(player)
 		return
 	end
 	plotByPlayer[player] = nil
-	for i = 1, Economy.PlotSlots do
-		local slot = plot.Slots[i]
-		if slot then
-			slot.Part:Destroy()
-			plot.Slots[i] = nil
-		end
+	for id, view in pairs(plot.Chests) do
+		view.Part:Destroy()
+		plot.Chests[id] = nil
+	end
+	for id, model in pairs(plot.Characters) do
+		model:Destroy()
+		plot.Characters[id] = nil
 	end
 	plot.Owner = nil
-	plot.FlashToken = nil
 	plot.Folder:SetAttribute("OwnerUserId", nil)
-	refreshSign(plot)
+	refresh(plot)
 end
 
 function PlotService.IsOwnPlot(player, plotPart)
@@ -169,82 +418,51 @@ function PlotService.IsOwnPlot(player, plotPart)
 	return plot ~= nil and plot.Part == plotPart
 end
 
-local function sell(player, plot, index)
-	local slot = plot.Slots[index]
-	if not slot or plot.Owner ~= player then
-		return
-	end
-	plot.Slots[index] = nil
-	slot.Part:Destroy()
-	addCash(player, slot.Config.SellPrice)
-	refreshSign(plot)
-	print(("[TreasureGame] %s sold %s for %d"):format(player.Name, slot.Config.TreasureName, slot.Config.SellPrice))
-end
-
--- Puts a treasure into the player's first free slot. Returns false if the plot is full.
-function PlotService.TryBank(player, cfg)
+-- Turns a banked treasure into a chest of the rarity rolled at dig time.
+function PlotService.AddChest(player, bossId, rarity)
 	local plot = plotByPlayer[player]
-	if not plot then
+	local data = PlayerData.Get(player)
+	if not plot or not data then
 		return false
 	end
-	local index
-	for i = 1, Economy.PlotSlots do
-		if not plot.Slots[i] then
-			index = i
-			break
-		end
-	end
-	if not index then
-		if not plot.FlashToken then
-			flashSign(plot, "Plot full! Sell a treasure")
-		end
-		return false
-	end
-
-	local display = Carry.MakeTreasure(cfg)
-	display.Anchored = true
-	local x, z = slotOffset(index)
-	display.CFrame = plot.Part.CFrame
-		* CFrame.new(x, plot.Part.Size.Y / 2 + display.Size.Y / 2 + 0.2, z)
-
-	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText = ("Sell for %d"):format(cfg.SellPrice)
-	prompt.ObjectText = cfg.TreasureName
-	prompt.KeyboardKeyCode = Enum.KeyCode.E
-	prompt.HoldDuration = Economy.SellHoldSeconds
-	prompt.RequiresLineOfSight = false
-	prompt.MaxActivationDistance = 10
-	prompt:SetAttribute("OwnerUserId", player.UserId)
-	CollectionService:AddTag(prompt, OWNER_ONLY_TAG)
-	prompt.Parent = display
-
-	prompt.Triggered:Connect(function(triggeredBy)
-		if triggeredBy == player then
-			sell(player, plot, index)
-		end
-	end)
-
-	display.Parent = plot.Folder
-	plot.Slots[index] = { Config = cfg, Part = display }
-	refreshSign(plot)
+	local boss = AnimeConfig.GetBoss(bossId)
+	local unlockSeconds = AnimeConfig.GetSeries(boss.OpensInto).UnlockTimeSeconds[rarity]
+	local chest = { Id = PlayerData.NewId(), BossId = bossId, Rarity = rarity, UnlockAt = os.time() + unlockSeconds }
+	table.insert(data.Chests, chest)
+	spawnChest(plot, player, chest)
+	layoutChests(plot, data)
+	updateChestTimers(plot)
+	refresh(plot)
 	return true
 end
 
--- Pays IncomePerSecond for every banked treasure, forever.
-function PlotService.StartIncome()
+-- Chest countdowns and income.
+function PlotService.Start()
+	task.spawn(function()
+		while true do
+			task.wait(TIMER_TICK)
+			for _, plot in pairs(plotByPlayer) do
+				updateChestTimers(plot)
+			end
+		end
+	end)
 	task.spawn(function()
 		while true do
 			task.wait(Economy.IncomeTickSeconds)
 			for player, plot in pairs(plotByPlayer) do
-				local total = 0
-				for i = 1, Economy.PlotSlots do
-					local slot = plot.Slots[i]
-					if slot then
-						total += slot.Config.IncomePerSecond * Economy.IncomeTickSeconds
+				local data = PlayerData.Get(player)
+				if data and player.Parent == Players then
+					local total = 0
+					for _, owned in ipairs(data.Characters) do
+						if owned.Location == "Plot" then
+							local entry = AnimeConfig.GetCharacter(owned.CharacterId)
+							total += entry.IncomePerSecond * Economy.IncomeTickSeconds
+						end
 					end
-				end
-				if total > 0 and player.Parent == Players then
-					addCash(player, total)
+					if total > 0 then
+						data.Cash += total
+						setStat(player, "Cash", data.Cash)
+					end
 				end
 			end
 		end

@@ -1,9 +1,10 @@
-# Core Rules (as built in Phase 3)
+# Core Rules (as built in Phase 3b)
 
-What the game does today. Edit the **Planned** lines to set the rules for later phases.
+What the game does today. Values in `code` live in the boss / series notes and AnimeConfig.
 
 ## Dig & carry
-- Hold **E** on the dig mound for `DigTimeSeconds` → treasure appears above your head.
+- Hold **E** on the dig mound for `DigTimeSeconds`.
+- When the dig completes, the **server** rolls the chest rarity from the boss's `RarityWeights`. The rarity shows on the treasure above your head.
 - One treasure per dig site at a time; it respawns on the mound once the boss is asleep again.
 
 ## Boss
@@ -14,25 +15,24 @@ What the game does today. Edit the **Planned** lines to set the rules for later 
 - Walks home and falls asleep `ReturnToSleepSeconds` after the chase ends.
 - The server decides all hits, damage and drops.
 
-## Plot assignment
-- On join you get the first free plot (Place1 → Place8). Its sign shows "<Name>'s Plot x/8".
-- Only your own plot banks treasure. Other plots do nothing.
-- Leaving frees the plot and removes everything on it. A 9th player gets no plot.
+## Plot
+- On join you get the first free plot (Place1 → Place8). Sign: "<Name>'s Plot x/8 | n chests".
+- Only your own plot accepts treasure. Leaving frees the plot. A 9th player gets no plot.
 
-## Banking & slots
-- Standing on your plot while carrying puts the treasure in a free slot (`PlotSlots` = 8).
-- Plot full → the treasure stays on your head and the sign shows "Plot full! Sell a treasure".
-- `Treasures` leaderstat = treasures on your plot right now.
+## Chests
+- Reaching your plot turns the treasure into a chest of its rarity. No limit on chests.
+- A chest needs `UnlockTimeSeconds` for its rarity before it can open. The timer runs on the server clock, so it keeps counting while you're offline.
+- When it's ready, hold **E** for `OpenTimeSeconds` to open it (only the owner sees the prompt).
 
-## Income (`IncomePerSecond`)
-- Every banked treasure pays `IncomePerSecond` into **Cash** once per second (`IncomeTickSeconds`).
-
-## Selling (`SellPrice`)
-- Hold **E** (`SellHoldSeconds` = 0.5) on a treasure on your plot → +`SellPrice` Cash, slot freed.
-- Only the owner sees and can use the Sell prompt.
+## Characters
+- Opening picks one character of the chest's rarity at random (equal chance) from the boss's series. Server only.
+- Up to 8 characters stand on your plot. Each earns its own `IncomePerSecond` into **Cash** every second.
+- If the plot is full, the character goes to your **inventory**: storage only, no income.
+- Treasures and characters are never sold.
 
 ## Saving
-- Session only: Cash, plot and banked treasures reset when you leave.
+- Cash, characters (plot + inventory) and unopened chests (rarity + unlock time) are saved.
+- If saving can't load (for example Studio API access is off), you play that session without saving.
 
 ## Losing the treasure
 - Hit by a boss skill, dying, respawning, or leaving the game → treasure is gone and returns to its dig site.

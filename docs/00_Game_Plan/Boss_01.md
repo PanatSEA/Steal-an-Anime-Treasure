@@ -7,8 +7,6 @@
 - Rarity: "Common"
 - TreasureName: "Tier 1 Anime Treasure"
 - DigTimeSeconds: 3
-- IncomePerSecond: 10
-- SellPrice: 100
 
 ## 2. Wake-Up, Chase & Telegraph Skill (Scales by Rarity/Stage)
 - DefaultState: "Sleeping"
@@ -35,3 +33,9 @@
 - TelegraphSoundId: "rbxassetid://0"
 - SkillHitSoundId: "rbxassetid://0"
 - SkillVFXName: "TBD"
+
+## 5. Chest Opening
+- OpensInto: "[[Series_01_Characters]]"
+- OpenKey: "E"
+- OpenTimeSeconds: 2
+- RarityWeights: Common 700, Epic 250, Legendary 45, Secret 5 (rolled when the dig completes)

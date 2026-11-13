@@ -9,8 +9,10 @@ local TREASURE_SIZE = Vector3.new(2.4, 1.8, 1.8)
 local TREASURE_COLOR = Color3.fromRGB(255, 200, 40)
 
 -- Placeholder until TreasureModelName has a real model.
-function Carry.MakeTreasure(cfg)
-	local rarity = AnimeConfig.Rarities[cfg.Rarity]
+-- rarityName is the chest rarity rolled at dig time (falls back to the boss tier).
+function Carry.MakeTreasure(cfg, rarityName)
+	rarityName = rarityName or cfg.Rarity
+	local rarity = AnimeConfig.Rarities[rarityName]
 
 	local part = Instance.new("Part")
 	part.Name = "Treasure_" .. cfg.BossId
@@ -41,7 +43,7 @@ function Carry.MakeTreasure(cfg)
 	label.TextScaled = true
 	label.TextColor3 = rarity.Color
 	label.TextStrokeTransparency = 0.3
-	label.Text = ("%s [%s]"):format(cfg.TreasureName, cfg.Rarity)
+	label.Text = ("%s [%s]"):format(cfg.TreasureName, rarityName)
 	label.Parent = billboard
 
 	return part
