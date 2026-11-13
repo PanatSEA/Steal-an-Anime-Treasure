@@ -1,7 +1,6 @@
-# Obsidian per-device UI state
-Test/.obsidian/workspace.json
-Test/.obsidian/workspace-mobile.json
-Test/.trash/
+# Obsidian vault settings and trash
+docs/.obsidian/
+docs/.trash/
 
 # Local Claude Code settings
 .claude/settings.local.json

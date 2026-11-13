@@ -3,7 +3,7 @@
 Roblox game: dig up a treasure outside the SAFE ZONE, carry it home while the
 guardian boss chases you and drops telegraphed skills you have to dodge.
 
-Design specs live in the Obsidian vault in [`Test/`](Test/Main_Index.md).
+Design specs live in the Obsidian vault in [`docs/`](docs/00_Game_Plan/Main_Index.md).
 
 ## Phase 1: Core Loop & Boss Telegraph Prototype
 
