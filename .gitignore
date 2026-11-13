@@ -1,0 +1,16 @@
+# Obsidian per-device UI state
+Test/.obsidian/workspace.json
+Test/.obsidian/workspace-mobile.json
+Test/.trash/
+
+# Local Claude Code settings
+.claude/settings.local.json
+
+# Roblox place files / backups
+*.rbxl.lock
+*.rbxlx.lock
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
