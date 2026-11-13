@@ -1,19 +1,23 @@
--- DigClient: Pickaxe digging visuals (Phase 4). Visual only: the server decides every hit.
+-- DigClient: Pickaxe digging visuals. Visual only: the server decides every hit.
 --   * Clicking with the Pickaxe swings it and asks the server to hit the nearest dig site.
---   * Each dig site shows a dirt mound with a buried chest. The visuals follow the site's
+--   * Each dig site shows a rock mound with a buried chest. The visuals follow the site's
 --     attributes (DigState, DigHits, DigHitsRequired, DigOwner, Rarity), so every player
 --     sees the same thing and players who join late see the current state.
+--   * Effects come from ReplicatedStorage/VFX via VfxPlayer; tune them in ChestFxPresets:
+--     DigHit on hits 1-2, ChestBurst (+ EmergeSoundId) on hit 3, ChestLand when the chest lands,
+--     IdleSparkle while the emerged chest waits to be picked up, MoundTwinkle/MoundPuff on mounds.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 local Workspace = game:GetService("Workspace")
-local CollectionService = game:GetService("CollectionService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local AnimeConfig = require(Shared:WaitForChild("AnimeConfig"))
 local TreasureModels = require(Shared:WaitForChild("TreasureModels"))
+local VfxPlayer = require(Shared:WaitForChild("VfxPlayer"))
+local ChestFxPresets = require(Shared:WaitForChild("ChestFxPresets"))
 
 local Dig = AnimeConfig.Dig
 local World = AnimeConfig.World
@@ -21,14 +25,15 @@ local localPlayer = Players.LocalPlayer
 local digHit = ReplicatedStorage:WaitForChild("Remote"):WaitForChild("DigHit")
 local digSites = Workspace:WaitForChild(World.GameFolderName):WaitForChild(World.DigSitesFolderName)
 
-local DUST_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
-local SPARKLE_TEXTURE = "rbxasset://textures/particles/sparkles_main.dds"
-local IDLE_EFFECT_SECONDS = 3.5
+local TWINKLE_SECONDS = 1.5 -- a crystal on an untouched mound twinkles this often
 local BURIED_DEPTH_FRACTION = 0.45 -- the chest starts this much of its height underground (hits 1 and 2 each lift a third)
 local BURIED_TILT = Vector2.new(10, 18) -- degrees (X, Z) so a lid corner pokes out of the mound
 local FINAL_MOUND_SCALE = 0.45 -- mound size just before the last hit
 local POP_HEIGHT = 3
-local BEAM_HEIGHT = { Common = 6, Epic = 10, Legendary = 16, Secret = 24 }
+local POP_SECONDS, FALL_SECONDS = 0.25, 0.6
+local FIRST_BOUNCE = 1 / 2.75 -- Bounce easing first touches the ground this far into the fall
+local CHUNKS_PER_HIT = 3
+local BREAKABLE = { Chunk = true, Crystal = true } -- mound parts that break off on hits
 local FACING = CFrame.Angles(0, math.rad(-90), 0) -- chest front faces +X, toward the lobby
 
 local views = {} -- [dig site Model] = view
@@ -80,18 +85,9 @@ local function shakeCamera(strength, seconds)
 	end)
 end
 
-local function emitter(parent, props)
-	local e = Instance.new("ParticleEmitter")
-	e.Enabled = false
-	for key, value in pairs(props) do
-		e[key] = value
-	end
-	e.Parent = parent
-	return e
-end
-
-local function sequence(a, b)
-	return NumberSequence.new({ NumberSequenceKeypoint.new(0, a), NumberSequenceKeypoint.new(1, b) })
+-- Presets are aimed with LookVector = main direction; for the chest that is straight up.
+local function aimUp(position)
+	return CFrame.lookAt(position, position + Vector3.yAxis, Vector3.zAxis)
 end
 
 local function siteInfo(model)
@@ -122,10 +118,67 @@ local function bossConfig(model)
 	return AnimeConfig.Bosses[model:GetAttribute("BossId")]
 end
 
+local function rarityTint(view)
+	return ChestFxPresets.RarityTint[view.Model:GetAttribute("Rarity")]
+end
+
+-- Where the pickaxe meets the rock: the side of the mound facing the digger, near the top,
+-- aimed back toward the digger and up so the spray flies out of the rock at them.
+local function impactCFrame(view)
+	local _, _, _, owner = siteInfo(view.Model)
+	local digger = Players:GetPlayerByUserId(owner)
+	local root = digger and digger.Character and digger.Character:FindFirstChild("HumanoidRootPart")
+	local from = root and root.Position or Workspace.CurrentCamera.CFrame.Position
+	local flat = (from - view.Ground) * Vector3.new(1, 0, 1)
+	flat = flat.Magnitude > 0.1 and flat.Unit or Vector3.new(1, 0, 0)
+	local radius, height = 2, 2.4
+	if view.Mound then
+		local _, size = view.Mound:GetBoundingBox()
+		radius, height = size.X * 0.22, size.Y * 0.55
+	end
+	local point = view.Ground + flat * radius + Vector3.new(0, height, 0)
+	return CFrame.lookAt(point, point + (flat + Vector3.yAxis).Unit)
+end
+
+local function breakableParts(mound)
+	local parts = {}
+	for _, part in ipairs(mound:GetDescendants()) do
+		if part:IsA("BasePart") and BREAKABLE[part.Name] then
+			table.insert(parts, part)
+		end
+	end
+	return parts
+end
+
+-- Loops ----------------------------------------------------------------------------
+
+local function stopIdle(view)
+	if view.StopLoop then
+		view.StopLoop()
+		view.StopLoop = nil
+	end
+end
+
+-- IdleSparkle around the emerged chest while it waits to be picked up.
+local function startIdle(view)
+	stopIdle(view)
+	local chest = view.Chest
+	local root = chest and chest.PrimaryPart
+	if not root then
+		return
+	end
+	local centre = (chest:GetBoundingBox()).Position
+	view.StopLoop = VfxPlayer.LoopPreset(ChestFxPresets.IdleSparkle, root, {
+		offset = root.CFrame:PointToObjectSpace(centre),
+		tint = rarityTint(view),
+	})
+end
+
 -- Building -----------------------------------------------------------------------
 
 local function clearVisuals(view)
-	for _, key in ipairs({ "Mound", "Chest", "Beam" }) do
+	stopIdle(view)
+	for _, key in ipairs({ "Mound", "Chest" }) do
 		if view[key] then
 			view[key]:Destroy()
 			view[key] = nil
@@ -156,48 +209,6 @@ local function buildChest(view, progress)
 	view.Chest = chest
 end
 
-local function showBeam(view, rarity)
-	if not AnimeConfig.Rarities[rarity] then
-		return
-	end
-	local color = TreasureModels.GlowColor(rarity)
-	local height = BEAM_HEIGHT[rarity] or 8
-	local beam = Instance.new("Part")
-	beam.Name = "RarityBeam"
-	beam.Shape = Enum.PartType.Cylinder
-	beam.Size = Vector3.new(height, 1.6, 1.6)
-	beam.CFrame = CFrame.new(view.Ground + Vector3.new(0, height / 2, 0)) * CFrame.Angles(0, 0, math.rad(90))
-	beam.Material = Enum.Material.Neon
-	beam.Color = color
-	beam.Transparency = 1
-	beam.Anchored = true
-	beam.CanCollide = false
-	beam.CanQuery = false
-	beam.CanTouch = false
-	beam.CastShadow = false
-	local light = Instance.new("PointLight")
-	light.Color = color
-	light.Range = 14
-	light.Brightness = 2
-	light.Parent = beam
-	if TreasureModels.IsRainbow(rarity) then
-		CollectionService:AddTag(beam, TreasureModels.RAINBOW_TAG)
-		CollectionService:AddTag(light, TreasureModels.RAINBOW_TAG)
-	end
-	beam.Parent = view.Folder
-	TweenService:Create(beam, TweenInfo.new(0.3), { Transparency = 0.55 }):Play()
-	view.Beam = beam
-end
-
-local function fadeBeam(view)
-	local beam = view.Beam
-	view.Beam = nil
-	if beam then
-		TweenService:Create(beam, TweenInfo.new(1), { Transparency = 1 }):Play()
-		Debris:AddItem(beam, 1.1)
-	end
-end
-
 -- Draws the current state with no animation (first load, late join).
 local function render(view)
 	clearVisuals(view)
@@ -207,10 +218,7 @@ local function render(view)
 	end
 	if state == "Emerged" then
 		buildChest(view, 1)
-		local rarity = view.Model:GetAttribute("Rarity")
-		if rarity then
-			showBeam(view, rarity)
-		end
+		startIdle(view)
 		return
 	end
 	buildMound(view, moundScale(hits, required))
@@ -235,29 +243,27 @@ local function scaleModel(model, to, seconds, style, direction)
 	end)
 end
 
+-- Breaks rock chunks and blue crystals off the mound (random ones, up to `count`).
 local function flingChunks(view, count)
 	if not view.Mound then
 		return
 	end
-	local flung = 0
-	for _, chunk in ipairs(view.Mound:GetDescendants()) do
-		if flung >= count then
-			break
-		end
-		if chunk:IsA("BasePart") and chunk.Name == "Chunk" then
-			flung += 1
-			local piece = chunk:Clone()
-			piece.Anchored = false
-			piece.CanCollide = false
-			piece.Parent = view.Folder
-			local outward = (chunk.Position - view.Ground) * Vector3.new(1, 0, 1)
-			outward = outward.Magnitude > 0.1 and outward.Unit or Vector3.new(1, 0, 0)
-			piece.AssemblyLinearVelocity = outward * math.random(10, 18) + Vector3.new(0, math.random(18, 28), 0)
-			piece.AssemblyAngularVelocity = Vector3.new(math.random(-8, 8), math.random(-8, 8), math.random(-8, 8))
-			TweenService:Create(piece, TweenInfo.new(1.2), { Transparency = 1 }):Play()
-			Debris:AddItem(piece, 1.3)
-			chunk:Destroy()
-		end
+	local parts = breakableParts(view.Mound)
+	for i = 1, math.min(count, #parts) do
+		local pick = math.random(i, #parts)
+		parts[i], parts[pick] = parts[pick], parts[i]
+		local chunk = parts[i]
+		local piece = chunk:Clone()
+		piece.Anchored = false
+		piece.CanCollide = false
+		piece.Parent = view.Folder
+		local outward = (chunk.Position - view.Ground) * Vector3.new(1, 0, 1)
+		outward = outward.Magnitude > 0.1 and outward.Unit or Vector3.new(1, 0, 0)
+		piece.AssemblyLinearVelocity = outward * math.random(10, 18) + Vector3.new(0, math.random(18, 28), 0)
+		piece.AssemblyAngularVelocity = Vector3.new(math.random(-8, 8), math.random(-8, 8), math.random(-8, 8))
+		TweenService:Create(piece, TweenInfo.new(1.2), { Transparency = 1 }):Play()
+		Debris:AddItem(piece, 1.3)
+		chunk:Destroy()
 	end
 end
 
@@ -266,10 +272,11 @@ local function isMine(view)
 	return owner == localPlayer.UserId
 end
 
+-- Hits 1 and 2.
 local function playHit(view, hits, required)
 	local boss = bossConfig(view.Model)
-	view.Dust:Emit(28)
-	flingChunks(view, 2)
+	VfxPlayer.PlayPreset(ChestFxPresets.DigHit, impactCFrame(view))
+	flingChunks(view, CHUNKS_PER_HIT)
 	if view.Mound then
 		scaleModel(view.Mound, moundScale(hits, required), 0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 	end
@@ -283,13 +290,15 @@ local function playHit(view, hits, required)
 	end
 end
 
+-- Hit 3: the chest bursts out, pops up and bounces down.
 local function playEmerge(view)
 	local boss = bossConfig(view.Model)
 	local rarity = view.Model:GetAttribute("Rarity")
 	if not view.Chest then
 		buildChest(view, 2 / 3)
 	end
-	view.Dust:Emit(40)
+	VfxPlayer.PlayPreset(ChestFxPresets.ChestBurst, aimUp(view.Ground + Vector3.new(0, 0.5, 0)))
+	playSound(boss and boss.EmergeSoundId, view.Fx)
 	flingChunks(view, 99)
 	local mound = view.Mound
 	view.Mound = nil
@@ -301,36 +310,37 @@ local function playEmerge(view)
 	local chest = view.Chest
 	if rarity then
 		TreasureModels.ApplyRarityGlow(chest, rarity, true)
-		showBeam(view, rarity)
 	end
 	local rest = chestPose(view, chest, 1)
 	local top = rest + Vector3.new(0, POP_HEIGHT, 0)
-	moveChest(chest, chest:GetPivot(), top, 0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	task.delay(0.25, function()
-		moveChest(chest, top, rest, 0.6, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out)
+	moveChest(chest, chest:GetPivot(), top, POP_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	task.delay(POP_SECONDS, function()
+		moveChest(chest, top, rest, FALL_SECONDS, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out)
 	end)
-	task.delay(0.15, function()
-		if rarity and TreasureModels.IsRainbow(rarity) then
-			view.Sparkle.Color = TreasureModels.RainbowSequence()
-		else
-			view.Sparkle.Color = ColorSequence.new(TreasureModels.GlowColor(rarity))
+	task.delay(POP_SECONDS + FALL_SECONDS * FIRST_BOUNCE, function()
+		if view.Chest == chest and chest.Parent then
+			VfxPlayer.PlayPreset(ChestFxPresets.ChestLand, aimUp(view.Ground))
 		end
-		view.Sparkle:Emit(45)
 	end)
-	playSound(boss and boss.EmergeSoundId, view.Fx)
+	task.delay(POP_SECONDS + FALL_SECONDS, function()
+		if view.Chest == chest and chest.Parent then
+			startIdle(view)
+		end
+	end)
 	if isMine(view) then
 		shakeCamera(0.5, 0.35)
 	end
 end
 
+-- Picked up: the chest shrinks away (it reappears on the owner's plot).
 local function playTaken(view)
+	stopIdle(view)
 	local chest = view.Chest
 	view.Chest = nil
 	if chest then
 		scaleModel(chest, 0.01, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 		Debris:AddItem(chest, 0.25)
 	end
-	fadeBeam(view)
 end
 
 -- A new mound grows in (treasure respawned, or a claim lapsed and the dig reset).
@@ -339,7 +349,7 @@ local function playRespawn(view)
 	buildMound(view, 0.01)
 	buildChest(view, 0)
 	scaleModel(view.Mound, 1, 0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-	view.Puff:Emit(8)
+	VfxPlayer.PlayPreset(ChestFxPresets.MoundPuff, aimUp(view.Ground + Vector3.new(0, 0.5, 0)))
 end
 
 local function updateLabel(view)
@@ -405,8 +415,6 @@ local function addSite(model)
 	fx.CanTouch = false
 	fx.CFrame = CFrame.new(ground + Vector3.new(0, 1.8, 0))
 	fx.Parent = folder
-	local attachment = Instance.new("Attachment")
-	attachment.Parent = fx
 
 	local billboard = Instance.new("BillboardGui")
 	billboard.Size = UDim2.fromOffset(220, 30)
@@ -428,35 +436,6 @@ local function addSite(model)
 		Folder = folder,
 		Fx = fx,
 		Label = label,
-		Dust = emitter(attachment, {
-			Texture = DUST_TEXTURE,
-			Color = ColorSequence.new(Color3.fromRGB(140, 100, 60)),
-			Size = sequence(1.2, 0.2),
-			Transparency = sequence(0.2, 1),
-			Lifetime = NumberRange.new(0.5, 0.9),
-			Speed = NumberRange.new(8, 16),
-			SpreadAngle = Vector2.new(70, 70),
-			Acceleration = Vector3.new(0, -25, 0),
-			RotSpeed = NumberRange.new(-90, 90),
-		}),
-		Puff = emitter(attachment, {
-			Texture = DUST_TEXTURE,
-			Color = ColorSequence.new(Color3.fromRGB(170, 135, 95)),
-			Size = sequence(1.5, 2.5),
-			Transparency = sequence(0.6, 1),
-			Lifetime = NumberRange.new(1.2, 1.8),
-			Speed = NumberRange.new(1, 3),
-			SpreadAngle = Vector2.new(60, 60),
-			Acceleration = Vector3.new(0, 1, 0),
-		}),
-		Sparkle = emitter(attachment, {
-			Texture = SPARKLE_TEXTURE,
-			LightEmission = 1,
-			Size = sequence(0.6, 0),
-			Lifetime = NumberRange.new(0.6, 1.2),
-			Speed = NumberRange.new(6, 14),
-			SpreadAngle = Vector2.new(180, 180),
-		}),
 	}
 	views[model] = view
 
@@ -478,6 +457,7 @@ local function addSite(model)
 	end
 	model.AncestryChanged:Connect(function()
 		if not model:IsDescendantOf(Workspace) then
+			stopIdle(view)
 			views[model] = nil
 			folder:Destroy()
 		end
@@ -490,15 +470,23 @@ for _, model in ipairs(digSites:GetChildren()) do
 end
 digSites.ChildAdded:Connect(addSite)
 
--- Idle effect: a gentle dust puff and a faint sparkle so untouched mounds stand out.
+-- Untouched mounds: one of their blue crystals twinkles now and then so they stand out.
 task.spawn(function()
 	while true do
-		task.wait(IDLE_EFFECT_SECONDS)
+		task.wait(TWINKLE_SECONDS)
 		for _, view in pairs(views) do
 			if view.Mound and view.State == "Buried" and view.Hits == 0 then
-				view.Puff:Emit(5)
-				view.Sparkle.Color = ColorSequence.new(Color3.fromRGB(255, 240, 200))
-				view.Sparkle:Emit(3)
+				local crystals = {}
+				for _, part in ipairs(breakableParts(view.Mound)) do
+					if part.Name == "Crystal" then
+						table.insert(crystals, part)
+					end
+				end
+				if #crystals > 0 then
+					local crystal = crystals[math.random(#crystals)]
+					local tip = crystal.Position + crystal.CFrame.UpVector * crystal.Size.Y * 0.5
+					VfxPlayer.PlayPreset(ChestFxPresets.MoundTwinkle, CFrame.new(tip))
+				end
 			end
 		end
 	end

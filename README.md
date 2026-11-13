@@ -21,14 +21,21 @@ Design specs live in the Obsidian vault in [`docs/`](docs/00_Game_Plan/Main_Inde
 | `src/ServerScriptService/TreasureGame/TreasureServer.server.lua` | `ServerScriptService.TreasureGame.TreasureServer` (Script) |
 | `src/ServerScriptService/TreasureGame/*.lua` | ModuleScripts beside it: `BossController`, `SkillPatterns`, `DigService`, `HeldPhysics`, `PlotService`, `PlayerData`, `InventoryService`, `Roll`, `ModelLoader`, `Carry`, `Remotes`, `Zones`, `Sfx` |
 | `src/ReplicatedStorage/Shared/TreasureModels.lua` | `ReplicatedStorage.Shared.TreasureModels` (ModuleScript, server + client) |
-| `src/StarterPlayer/StarterPlayerScripts/*.client.lua` | LocalScripts: `DigClient` (Pickaxe + dig visuals), `ChestFx` (lid + coins), `OwnerOnlyPrompts` |
+| `src/ReplicatedStorage/Shared/VfxPlayer.lua` | `ReplicatedStorage.Shared.VfxPlayer` (ModuleScript, client only: plays the VFX packs) |
+| `src/ReplicatedStorage/Shared/ChestFxPresets.lua` | `ReplicatedStorage.Shared.ChestFxPresets` (ModuleScript: which pack layers play at each dig/chest moment; tune here) |
+| `assets/VFX/*.rbxm` | The four KitsBlox VFX packs, in Studio as `ReplicatedStorage.VFX.<PBlue\|FistShotVFX_2\|Frost\|SplashPuddle>` |
+| `src/StarterPlayer/StarterPlayerScripts/*.client.lua` | LocalScripts: `DigClient` (Pickaxe + dig visuals), `ChestFx` (plot chest effects, opening burst + light beam), `OwnerOnlyPrompts` |
 | `tools/FixPickaxeTool.luau` | Run in the Studio command bar to apply the held-tool physics rules and grip to `StarterPack.Pickaxe` |
-| `tools/BuildPhase4Models.luau` | Run in the Studio command bar to (re)build `ReplicatedStorage.Models.Treasures.DirtMound` (never touches the chest) |
+| `tools/BuildPhase4Models.luau` | Run in the Studio command bar to (re)build `ReplicatedStorage.Models.Treasures.DirtMound`, the pale rock mound with blue crystals (never touches the chest) |
 | `tools/PrepareChestModel.luau` | Run in the Studio command bar after dropping in a new `Models.Treasures.Chest` |
+| `tools/BuildPhase1World.luau` | Run in the Studio command bar to (re)build `Workspace.TreasureGame` |
 | `src/ReplicatedStorage/Assets/Items/CharacterItemDefinitions.lua` | `ReplicatedStorage.Assets.Items.CharacterItemDefinitions`, called by a 2-line hook in the existing `ItemDefinitions` (not in this repo) |
 
-Models are loaded by name from `ReplicatedStorage.Models.Bosses.<BossId>`, `ReplicatedStorage.Models.Characters.<SeriesId>.<CharacterId>` and `ReplicatedStorage.Models.Treasures.<Chest|DirtMound>`; missing ones fall back to placeholders (the part-built chest lives in `TreasureModels`). A new chest model: drop it in, then run `tools/PrepareChestModel.luau` (Root PrimaryPart with the pivot at the bottom centre, front facing −Z, everything welded and non-colliding, 3.3 studs wide). An optional `Lid` model pivoted on its back hinge opens with a lid animation; a single-mesh chest opens with a burst. Rarity is a glow (halo, light, aura: Common white, Epic purple, Legendary gold, Secret rainbow), never a repaint. A replacement mound needs a `Root` PrimaryPart at ground level and `Chunk` parts.
-| `tools/BuildPhase1World.luau` | Run in the Studio command bar to (re)build `Workspace.TreasureGame` |
+Models are loaded by name from `ReplicatedStorage.Models.Bosses.<BossId>`, `ReplicatedStorage.Models.Characters.<SeriesId>.<CharacterId>` and `ReplicatedStorage.Models.Treasures.<Chest|DirtMound>`; missing ones fall back to placeholders (the part-built chest lives in `TreasureModels`). A new chest model: drop it in, then run `tools/PrepareChestModel.luau` (Root PrimaryPart with the pivot at the bottom centre, front facing −Z, everything welded and non-colliding, 3.3 studs wide). An optional `Lid` model pivoted on its back hinge opens with a lid animation; a single-mesh chest opens with a burst. Rarity is a glow (soft glow sprite, light, sparkle aura: Common white, Epic purple, Legendary gold, Secret rainbow), never a repaint. A replacement mound needs a `Root` PrimaryPart at ground level; parts named `Chunk` or `Crystal` break off on hits.
+
+## VFX
+
+The dig and chest effects are particle layers from the four packs in `assets/VFX`, played by `VfxPlayer` from the recipes in `ChestFxPresets` ([VFX plan](docs/00_Game_Plan/VFX_Plan.md)). Studio's insert tools only take Creator Store IDs, so the packs were rebuilt into `ReplicatedStorage.VFX` from the decoded `.rbxm` files with every emitter property and attribute checked. To update a pack, right-click `ReplicatedStorage.VFX` → **Insert from File…**, pick the `.rbxm` and keep its name. Effects tuned in VFX Studio / Effect Designer Suite keep working: `EmitCount`, `EmitDelay` and `EmitDuration` attributes are read.
 
 ## Adding Boss_02 / Boss_03
 

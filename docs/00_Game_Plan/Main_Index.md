@@ -31,6 +31,10 @@
   - A new mound appears at the node when the treasure respawns
   - Sounds/animations: `rbxassetid://0` placeholders with `-- TODO(asset):` (hit sound, emerge sound, swing animation); procedural tween motion while the animation ID is 0
   - Exploit safety: the client only plays visuals. The server counts hits, checks the Pickaxe is equipped, checks distance to the node and rate-limits hits. Only the server's 3rd hit spawns the chest, rolls rarity and wakes the boss
+- **Phase 5 "VFX" (branch phase-5-vfx):** the dig and chest moments use 4 KitsBlox VFX packs (`ReplicatedStorage/VFX`) through `VfxPlayer` + `ChestFxPresets`, styled after the reference picture. See [[VFX_Plan]]
+  - Replaces the Phase 4 neon light beam, neon halo ring, dust/sparkle emitters and the coin pop; rarity is now a soft glow sprite + light + sparkle aura
+  - The mound is pale rock with blue crystals; rock chunks and crystals break off on hits
+  - The plot chest prompt reads **Search**; opening adds a thin white light beam
 
 ## Stage 1: Anime Series 1 (3 Bosses)
 - [[Boss_01]]

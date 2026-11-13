@@ -24,7 +24,7 @@ local World = AnimeConfig.World
 local Economy = AnimeConfig.Economy
 local ChestConfig = AnimeConfig.Chest
 
-local treasureFx = Remotes.Event("TreasureFx") -- clients play the lid-opening + coin-pop animation
+local treasureFx = Remotes.Event("TreasureFx") -- clients play the chest-opening effect (ChestFx)
 
 local OWNER_ONLY_TAG = "OwnerOnlyPrompt" -- client shows these only to the owner (and only when Ready)
 local TIMER_TICK = 0.5
@@ -212,16 +212,20 @@ end
 
 local openChest -- forward declaration
 
-local function spawnChest(plot, player, chest)
+-- `placed` = a new chest just banked (clients play its landing effect), not one restored on join.
+local function spawnChest(plot, player, chest, placed)
 	local boss = AnimeConfig.GetBoss(chest.BossId)
 	local model = Carry.MakeTreasure(boss, chest.Rarity, { Scale = ChestConfig.PlotScale, Anchored = true })
 	model.Name = "Chest_" .. chest.Rarity
+	if placed then
+		model:SetAttribute("PlacedAt", workspace:GetServerTimeNow())
+	end
 	local label = Carry.GetLabel(model)
 	label.Parent.Size = UDim2.fromOffset(200, 40)
 
 	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText = "Open"
-	prompt.ObjectText = chest.Rarity .. " Chest"
+	prompt.ActionText = "Search" -- like the reference: a "SEARCH" prompt next to the chest
+	prompt.ObjectText = ""
 	prompt.KeyboardKeyCode = Enum.KeyCode[boss.OpenKey] or Enum.KeyCode.E
 	prompt.HoldDuration = boss.OpenTimeSeconds
 	prompt.RequiresLineOfSight = false
@@ -249,7 +253,7 @@ local function updateChestTimers(plot)
 		local remaining = view.Chest.UnlockAt - now
 		local ready = remaining <= 0
 		view.Label.Text = ready
-			and ("%s Chest\nReady! Hold %s"):format(view.Chest.Rarity, AnimeConfig.GetBoss(view.Chest.BossId).OpenKey)
+			and ("%s Chest\nReady! Hold %s to search"):format(view.Chest.Rarity, AnimeConfig.GetBoss(view.Chest.BossId).OpenKey)
 			or ("%s Chest\n%s"):format(view.Chest.Rarity, formatTime(remaining))
 		if view.Prompt:GetAttribute("Ready") ~= ready then
 			view.Prompt:SetAttribute("Ready", ready)
@@ -295,6 +299,7 @@ openChest = function(player, chestId)
 
 	if view then
 		view.Opening = true
+		view.Model:SetAttribute("Opening", true) -- clients stop the chest's loops instead of switching back to idle
 		view.Prompt:SetAttribute("Ready", false)
 		view.Label.Text = ("%s Chest\nOpening..."):format(chest.Rarity)
 		treasureFx:FireAllClients("ChestOpen", view.Model)
@@ -450,7 +455,7 @@ function PlotService.AddChest(player, bossId, rarity)
 	local unlockSeconds = AnimeConfig.GetSeries(boss.OpensInto).UnlockTimeSeconds[rarity]
 	local chest = { Id = PlayerData.NewId(), BossId = bossId, Rarity = rarity, UnlockAt = os.time() + unlockSeconds }
 	table.insert(data.Chests, chest)
-	spawnChest(plot, player, chest)
+	spawnChest(plot, player, chest, true)
 	layoutChests(plot, data)
 	updateChestTimers(plot)
 	refresh(plot)
