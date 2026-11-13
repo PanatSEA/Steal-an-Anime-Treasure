@@ -15,7 +15,7 @@
 - TriggerCondition: "OnDigCompleted"
 - WalkSpeed: 18
 - ChaseStopInSafeZone: true
-- ReturnToSleepSeconds: 8.0
+- ReturnToSleepSeconds: 5.0
 - SkillPattern: "CircleTelegraph"
 - SkillCooldownSeconds: 3.5
 - TelegraphWarningSeconds: 1.5
