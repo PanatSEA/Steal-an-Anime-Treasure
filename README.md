@@ -19,11 +19,13 @@ Design specs live in the Obsidian vault in [`docs/`](docs/00_Game_Plan/Main_Inde
 | --- | --- |
 | `src/ReplicatedStorage/Shared/AnimeConfig.lua` | `ReplicatedStorage.Shared.AnimeConfig` (ModuleScript) |
 | `src/ServerScriptService/TreasureGame/TreasureServer.server.lua` | `ServerScriptService.TreasureGame.TreasureServer` (Script) |
-| `src/ServerScriptService/TreasureGame/*.lua` | ModuleScripts beside it: `BossController`, `SkillPatterns`, `PlotService`, `PlayerData`, `InventoryService`, `Roll`, `ModelLoader`, `Carry`, `Zones`, `Sfx` |
-| `src/StarterPlayer/StarterPlayerScripts/OwnerOnlyPrompts.client.lua` | `StarterPlayer.StarterPlayerScripts.OwnerOnlyPrompts` (LocalScript) |
+| `src/ServerScriptService/TreasureGame/*.lua` | ModuleScripts beside it: `BossController`, `SkillPatterns`, `DigService`, `PlotService`, `PlayerData`, `InventoryService`, `Roll`, `ModelLoader`, `Carry`, `Remotes`, `Zones`, `Sfx` |
+| `src/ReplicatedStorage/Shared/TreasureModels.lua` | `ReplicatedStorage.Shared.TreasureModels` (ModuleScript, server + client) |
+| `src/StarterPlayer/StarterPlayerScripts/*.client.lua` | LocalScripts: `DigClient` (Pickaxe + dig visuals), `ChestFx` (lid + coins), `OwnerOnlyPrompts` |
+| `tools/BuildPhase4Models.luau` | Run in the Studio command bar to (re)build `ReplicatedStorage.Models.Treasures.Chest` and `DirtMound` |
 | `src/ReplicatedStorage/Assets/Items/CharacterItemDefinitions.lua` | `ReplicatedStorage.Assets.Items.CharacterItemDefinitions`, called by a 2-line hook in the existing `ItemDefinitions` (not in this repo) |
 
-Models are loaded by name from `ReplicatedStorage.Models.Bosses.<BossId>` and `ReplicatedStorage.Models.Characters.<SeriesId>.<CharacterId>`; missing ones show as grey dummies.
+Models are loaded by name from `ReplicatedStorage.Models.Bosses.<BossId>`, `ReplicatedStorage.Models.Characters.<SeriesId>.<CharacterId>` and `ReplicatedStorage.Models.Treasures.<Chest|DirtMound>`; missing ones fall back to placeholders. A replacement chest needs a `Base` PrimaryPart, `Trim` parts and a `Lid` model pivoted on its hinge; a replacement mound needs a `Root` PrimaryPart at ground level and `Chunk` parts.
 | `tools/BuildPhase1World.luau` | Run in the Studio command bar to (re)build `Workspace.TreasureGame` |
 
 ## Adding Boss_02 / Boss_03

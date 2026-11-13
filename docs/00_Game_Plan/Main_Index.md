@@ -20,6 +20,17 @@
   - Income into Cash: each plot character earns its own `IncomePerSecond`
   - Saving: characters, Cash and unopened chests (rarity + timer) between sessions
   - Models load by name: `ReplicatedStorage/Models/Bosses/<BossId>`, `ReplicatedStorage/Models/Characters/<Series>/<CharacterId>`; missing → grey dummy with a name label
+- **Phase 4 "Dig feel":** (decided: first hitter claims the dig; Pickaxe lives in hotbar slot 1; rarity shown as trim colour + light beam)
+  - Dirt mound at each dig node (rounded cartoon Parts, brown dirt, small rocks/pebbles) at `ReplicatedStorage/Models/Treasures/DirtMound`; idle dust puff or faint sparkle every few seconds
+  - The chest starts buried under the mound with only a hint showing (cracked mound or a lid corner)
+  - Dig with the existing **Pickaxe** Tool (StarterPack, not renamed): click to hit, `DigHitsRequired` = 3 replaces `DigTimeSeconds`
+  - Hits 1–2: pickaxe swing, dirt particle burst, small camera shake; the mound shrinks and loses chunks; the chest rises about ⅓ with a TweenService Back-easing bounce
+  - Hit 3: the mound is gone, the chest pops fully out with a bounce and sparkle burst and shows its rarity (trim colour or light beam: Common, Epic, Legendary, Secret); then the boss wakes (`OnDigCompleted`)
+  - The lid stays closed until it's opened with E on your plot (lid-opening + coin-pop animation)
+  - Chest model: stylized low-poly Parts (wood box, metal trim, a bit of moss) at `ReplicatedStorage/Models/Treasures/Chest`, loaded by name so it can be replaced
+  - A new mound appears at the node when the treasure respawns
+  - Sounds/animations: `rbxassetid://0` placeholders with `-- TODO(asset):` (hit sound, emerge sound, swing animation); procedural tween motion while the animation ID is 0
+  - Exploit safety: the client only plays visuals. The server counts hits, checks the Pickaxe is equipped, checks distance to the node and rate-limits hits. Only the server's 3rd hit spawns the chest, rolls rarity and wakes the boss
 
 ## Stage 1: Anime Series 1 (3 Bosses)
 - [[Boss_01]]

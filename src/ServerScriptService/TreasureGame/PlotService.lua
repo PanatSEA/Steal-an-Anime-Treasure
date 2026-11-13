@@ -17,9 +17,13 @@ local ModelLoader = require(script.Parent.ModelLoader)
 local Roll = require(script.Parent.Roll)
 local PlayerData = require(script.Parent.PlayerData)
 local InventoryService = require(script.Parent.InventoryService)
+local Remotes = require(script.Parent.Remotes)
 
 local World = AnimeConfig.World
 local Economy = AnimeConfig.Economy
+local ChestConfig = AnimeConfig.Chest
+
+local treasureFx = Remotes.Event("TreasureFx") -- clients play the lid-opening + coin-pop animation
 
 local OWNER_ONLY_TAG = "OwnerOnlyPrompt" -- client shows these only to the owner (and only when Ready)
 local TIMER_TICK = 0.5
@@ -183,7 +187,7 @@ end
 
 -- Chests --------------------------------------------------------------------
 
-local function chestCFrame(plot, index, part)
+local function chestCFrame(plot, index, model)
 	local perLayer = CHEST_COLUMNS * CHEST_ROWS_PER_LAYER
 	local layer = (index - 1) // perLayer
 	local inLayer = (index - 1) % perLayer
@@ -191,7 +195,7 @@ local function chestCFrame(plot, index, part)
 	local row = inLayer // CHEST_COLUMNS
 	local x = (col - (CHEST_COLUMNS - 1) / 2) * CHEST_SPACING.X
 	local z = CHEST_ROW_Z + row * CHEST_SPACING.Y
-	local y = plotTop(plot) + part.Size.Y / 2 + 0.2 + layer * CHEST_LAYER_HEIGHT
+	local y = plotTop(plot) + model.PrimaryPart.Size.Y / 2 + 0.05 + layer * CHEST_LAYER_HEIGHT
 	return plot.Part.CFrame * CFrame.new(x, y, z)
 end
 
@@ -199,7 +203,7 @@ local function layoutChests(plot, data)
 	for index, chest in ipairs(data.Chests) do
 		local view = plot.Chests[chest.Id]
 		if view then
-			view.Part.CFrame = chestCFrame(plot, index, view.Part)
+			view.Model:PivotTo(chestCFrame(plot, index, view.Model))
 		end
 	end
 end
@@ -208,10 +212,9 @@ local openChest -- forward declaration
 
 local function spawnChest(plot, player, chest)
 	local boss = AnimeConfig.GetBoss(chest.BossId)
-	local part = Carry.MakeTreasure(boss, chest.Rarity)
-	part.Name = "Chest_" .. chest.Rarity
-	part.Anchored = true
-	local label = part:FindFirstChildOfClass("BillboardGui"):FindFirstChildOfClass("TextLabel")
+	local model = Carry.MakeTreasure(boss, chest.Rarity, { Scale = ChestConfig.PlotScale, Anchored = true })
+	model.Name = "Chest_" .. chest.Rarity
+	local label = Carry.GetLabel(model)
 	label.Parent.Size = UDim2.fromOffset(200, 40)
 
 	local prompt = Instance.new("ProximityPrompt")
@@ -224,20 +227,23 @@ local function spawnChest(plot, player, chest)
 	prompt:SetAttribute("OwnerUserId", player.UserId)
 	prompt:SetAttribute("Ready", false)
 	CollectionService:AddTag(prompt, OWNER_ONLY_TAG)
-	prompt.Parent = part
+	prompt.Parent = model.PrimaryPart
 	prompt.Triggered:Connect(function(triggeredBy)
 		if triggeredBy == player then
 			openChest(player, chest.Id)
 		end
 	end)
 
-	part.Parent = plot.Folder
-	plot.Chests[chest.Id] = { Part = part, Label = label, Prompt = prompt, Chest = chest }
+	model.Parent = plot.Folder
+	plot.Chests[chest.Id] = { Model = model, Label = label, Prompt = prompt, Chest = chest }
 end
 
 local function updateChestTimers(plot)
 	local now = os.time()
 	for _, view in pairs(plot.Chests) do
+		if view.Opening then
+			continue
+		end
 		local remaining = view.Chest.UnlockAt - now
 		local ready = remaining <= 0
 		view.Label.Text = ready
@@ -265,14 +271,13 @@ openChest = function(player, chestId)
 	if not chest or os.time() < chest.UnlockAt then
 		return -- unknown chest or still locked: the server decides, not the client
 	end
-
-	table.remove(data.Chests, index)
 	local view = plot.Chests[chestId]
-	if view then
-		view.Part:Destroy()
-		plot.Chests[chestId] = nil
+	if view and view.Opening then
+		return
 	end
 
+	-- Commit the result to the player's data first, so leaving mid-animation loses nothing.
+	table.remove(data.Chests, index)
 	local boss = AnimeConfig.GetBoss(chest.BossId)
 	local picked = Roll.Character(boss.OpensInto, chest.Rarity)
 	local slot = freePlotSlot(data)
@@ -284,6 +289,20 @@ openChest = function(player, chestId)
 		AcquiredAt = os.time(),
 	}
 	table.insert(data.Characters, owned)
+	refresh(plot)
+
+	if view then
+		view.Opening = true
+		view.Prompt:SetAttribute("Ready", false)
+		view.Label.Text = ("%s Chest\nOpening..."):format(chest.Rarity)
+		treasureFx:FireAllClients("ChestOpen", view.Model)
+		task.wait(ChestConfig.OpenAnimationSeconds)
+		view.Model:Destroy()
+		plot.Chests[chestId] = nil
+	end
+	if plotByPlayer[player] ~= plot then
+		return -- they left during the animation; their data already has the character
+	end
 
 	if slot then
 		spawnCharacter(plot, owned)
@@ -401,7 +420,7 @@ function PlotService.Release(player)
 	end
 	plotByPlayer[player] = nil
 	for id, view in pairs(plot.Chests) do
-		view.Part:Destroy()
+		view.Model:Destroy()
 		plot.Chests[id] = nil
 	end
 	for id, model in pairs(plot.Characters) do

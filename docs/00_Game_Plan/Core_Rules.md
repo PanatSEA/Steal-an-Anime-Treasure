@@ -1,11 +1,15 @@
-# Core Rules (as built in Phase 3b)
+# Core Rules (as built in Phase 4)
 
 What the game does today. Values in `code` live in the boss / series notes and AnimeConfig.
 
 ## Dig & carry
-- Hold **E** on the dig mound for `DigTimeSeconds`.
-- When the dig completes, the **server** rolls the chest rarity from the boss's `RarityWeights`. The rarity shows on the treasure above your head.
-- One treasure per dig site at a time; it respawns on the mound once the boss is asleep again.
+- Each dig node shows a dirt mound with a chest buried under it (a lid corner pokes out). Untouched mounds puff dust and sparkle every few seconds.
+- Equip the **Pickaxe** from hotbar slot 1 (press 1) and click near the mound. It takes `DigHitsRequired` hits.
+- Each hit: the mound shrinks and loses chunks, dirt bursts out, the chest rises about a third, and the digger's camera shakes.
+- Final hit: the mound is gone, the chest pops out with a bounce and sparkles, and shows the rarity the **server** rolled from `RarityWeights` (trim colour + light beam). The boss wakes and the chest lands on your head.
+- **First hitter claims the dig.** Other players' hits are ignored. The claim lapses after 10s without a hit, if the digger walks 25 studs away, dies or leaves, and the mound grows back.
+- The server checks every hit: Pickaxe equipped, within 12 studs, not faster than one hit per 0.35s. The client only plays visuals.
+- One treasure per dig site at a time; a new mound appears once the boss is asleep again.
 
 ## Boss
 - Sleeps by its dig site. Wakes when a dig completes and chases the carrier at `WalkSpeed`.
@@ -22,7 +26,7 @@ What the game does today. Values in `code` live in the boss / series notes and A
 ## Chests
 - Reaching your plot turns the treasure into a chest of its rarity. No limit on chests.
 - A chest needs `UnlockTimeSeconds` for its rarity before it can open. The timer runs on the server clock, so it keeps counting while you're offline.
-- When it's ready, hold **E** for `OpenTimeSeconds` to open it (only the owner sees the prompt).
+- When it's ready, hold **E** for `OpenTimeSeconds` to open it (only the owner sees the prompt). The lid swings open and coins pop out before the character appears.
 
 ## Characters
 - Opening picks one character of the chest's rarity at random (equal chance) from the boss's series. Server only.

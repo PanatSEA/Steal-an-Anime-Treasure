@@ -1,5 +1,5 @@
--- CharacterItemDefinitions: adds every series character from AnimeConfig to
--- ItemDefinitions so the existing inventory UI can show them.
+-- CharacterItemDefinitions: adds the Pickaxe and every series character from
+-- AnimeConfig to ItemDefinitions so the existing inventory UI can show them.
 -- DefinitionId = CharacterId. Called from ItemDefinitions before it freezes:
 --   require(script.Parent:WaitForChild("CharacterItemDefinitions"))(ItemDefinitions)
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -9,6 +9,21 @@ local AnimeConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChil
 local SORT_BASE = 1000
 
 return function(definitions)
+	-- The Pickaxe Tool, shown in hotbar slot 1 (InventoryService).
+	definitions["Tool_Pickaxe"] = {
+		Theme = "Tools",
+		SeriesName = "Tool",
+		DisplayName = AnimeConfig.Dig.ToolName,
+		Rarity = "Common",
+		Model = AnimeConfig.Dig.ToolName,
+		Icon = "", -- TODO(asset): pickaxe icon
+		Category = "Tool",
+		Description = "Click a dirt mound to dig",
+		MaxStack = 1,
+		CanEquip = true,
+		SortOrder = 1,
+	}
+
 	for seriesId, series in pairs(AnimeConfig.Series) do
 		for index, entry in ipairs(series.Characters) do
 			definitions[entry.CharacterId] = {

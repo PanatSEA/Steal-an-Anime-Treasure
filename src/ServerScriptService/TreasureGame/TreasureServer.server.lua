@@ -1,7 +1,8 @@
 -- TreasureServer: core loop.
--- Dig (hold E) -> server rolls the chest rarity -> carry it above your head ->
--- boss wakes and chases with telegraphed skills -> reach YOUR plot in the SAFE
--- ZONE -> it becomes a chest that unlocks, opens into a character and earns Cash
+-- Hit the dirt mound with the Pickaxe (DigService) -> on the final hit the server
+-- rolls the chest rarity, the chest pops out and lands on your head -> the boss
+-- wakes and chases with telegraphed skills -> reach YOUR plot in the SAFE ZONE ->
+-- it becomes a chest that unlocks, opens into a character and earns Cash
 -- (PlotService). Cash, characters and chests are saved (PlayerData).
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -10,9 +11,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local AnimeConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("AnimeConfig"))
 local Zones = require(script.Parent.Zones)
 local Carry = require(script.Parent.Carry)
-local Sfx = require(script.Parent.Sfx)
 local Roll = require(script.Parent.Roll)
 local BossController = require(script.Parent.BossController)
+local DigService = require(script.Parent.DigService)
 local PlayerData = require(script.Parent.PlayerData)
 local InventoryService = require(script.Parent.InventoryService)
 local PlotService = require(script.Parent.PlotService)
@@ -30,18 +31,13 @@ end
 
 local DELIVERY_TICK = 0.2
 
--- [Player] = { Site = site, Part = BasePart, Rarity = string }
+-- [Player] = { Site = site, Part = Model?, Rarity = string }
+-- Part is nil while the chest is still popping out of the ground.
 local carrying = {}
 
 PlotService.Init()
 PlotService.Start()
 PlayerData.StartAutosave()
-
-local function setSiteAvailable(site, available)
-	site.Available = available
-	site.Prompt.Enabled = available
-	site.Display.Parent = available and site.Model or nil
-end
 
 local function releaseTreasure(player, reason)
 	local entry = carrying[player]
@@ -64,6 +60,42 @@ local function deliver(player)
 	end
 end
 
+local function setSiteAvailable(site, available)
+	site.Available = available
+	if available then
+		DigService.Reset(site.Model) -- a new mound with a buried chest
+	end
+end
+
+-- The server's final hit: roll the rarity, wake the boss, then lift the chest onto the digger.
+local function completeDig(site, player)
+	local cfg = site.Config
+	local rarity = Roll.Rarity(cfg.RarityWeights)
+	site.Available = false
+
+	local entry = { Site = site, Part = nil, Rarity = rarity }
+	carrying[player] = entry
+	player:SetAttribute("CarryingTreasure", cfg.BossId)
+	player:SetAttribute("CarryingRarity", rarity)
+	print(("[TreasureGame] %s dug up a %s %s — %s wakes up!"):format(player.Name, rarity, cfg.TreasureName, cfg.DisplayName))
+	site.Boss:Wake(player)
+
+	-- Let every client play the pop-out first, then put the chest on the digger's head.
+	task.delay(AnimeConfig.Dig.EmergeSeconds, function()
+		DigService.SetTaken(site.Model)
+		if carrying[player] ~= entry then
+			return -- dropped (hit, died or left) while the chest was popping out
+		end
+		local treasure = Carry.MakeTreasure(cfg, rarity, { Scale = AnimeConfig.Chest.CarryScale })
+		if player.Character and Carry.AttachToCharacter(player.Character, treasure) then
+			entry.Part = treasure
+		else
+			treasure:Destroy()
+		end
+	end)
+	return rarity
+end
+
 local function setupSite(model)
 	local bossId = model:GetAttribute("BossId")
 	if not bossId then
@@ -71,24 +103,16 @@ local function setupSite(model)
 		return
 	end
 	local cfg = AnimeConfig.GetBoss(bossId)
-	local mound = model:WaitForChild("DigMound")
+	local site = { Model = model, Config = cfg, Available = false }
 
-	local prompt = mound:FindFirstChildOfClass("ProximityPrompt") or Instance.new("ProximityPrompt")
-	prompt.ActionText = "Dig"
-	prompt.ObjectText = cfg.TreasureName
-	prompt.KeyboardKeyCode = Enum.KeyCode.E
-	prompt.HoldDuration = cfg.DigTimeSeconds
-	prompt.RequiresLineOfSight = false
-	prompt.MaxActivationDistance = 12
-	prompt.Parent = mound
-
-	-- The mound shows a neutral treasure; the rarity is only rolled when a dig completes.
-	local display = Carry.MakeTreasure(cfg)
-	display.Anchored = true
-	display.CFrame = mound.CFrame * CFrame.new(0, mound.Size.Y / 2 + display.Size.Y / 2 + 0.2, 0)
-	display:FindFirstChildOfClass("BillboardGui"):FindFirstChildOfClass("TextLabel").Text = cfg.TreasureName
-
-	local site = { Model = model, Config = cfg, Prompt = prompt, Display = display, Available = false }
+	DigService.Register(model, cfg, {
+		CanDig = function(player)
+			return site.Available and not carrying[player]
+		end,
+		OnComplete = function(player)
+			return completeDig(site, player)
+		end,
+	})
 
 	site.Boss = BossController.new(model, cfg, {
 		EffectsFolder = effectsFolder,
@@ -106,31 +130,6 @@ local function setupSite(model)
 			setSiteAvailable(site, true)
 		end,
 	})
-
-	prompt.Triggered:Connect(function(player)
-		if not site.Available or carrying[player] then
-			return
-		end
-		local character = player.Character
-		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		if not humanoid or humanoid.Health <= 0 then
-			return
-		end
-
-		local rarity = Roll.Rarity(cfg.RarityWeights) -- server-side roll at dig time
-		local treasure = Carry.MakeTreasure(cfg, rarity)
-		if not Carry.AttachToCharacter(character, treasure) then
-			treasure:Destroy()
-			return
-		end
-		setSiteAvailable(site, false)
-		carrying[player] = { Site = site, Part = treasure, Rarity = rarity }
-		player:SetAttribute("CarryingTreasure", cfg.BossId)
-		player:SetAttribute("CarryingRarity", rarity)
-		Sfx.Play(cfg.DigSoundId, mound)
-		print(("[TreasureGame] %s dug a %s %s — %s wakes up!"):format(player.Name, rarity, cfg.TreasureName, cfg.DisplayName))
-		site.Boss:Wake(player)
-	end)
 end
 
 for _, model in ipairs(digSitesFolder:GetChildren()) do
@@ -166,6 +165,7 @@ local function onPlayerAdded(player)
 	if player.Character then
 		task.spawn(onCharacterAdded, player, player.Character)
 	end
+	InventoryService.Track(player)
 
 	local data = PlayerData.Load(player) -- yields
 	if player.Parent ~= Players then
@@ -200,10 +200,10 @@ end)
 -- Only your own plot accepts the treasure.
 task.spawn(function()
 	while true do
-		for player, _ in pairs(carrying) do
+		for player, entry in pairs(carrying) do
 			local character = player.Character
 			local root = character and character:FindFirstChild("HumanoidRootPart")
-			local plotPart = root and Zones.FindPlotAt(root.Position)
+			local plotPart = entry.Part and root and Zones.FindPlotAt(root.Position)
 			if plotPart and PlotService.IsOwnPlot(player, plotPart) then
 				deliver(player)
 			end

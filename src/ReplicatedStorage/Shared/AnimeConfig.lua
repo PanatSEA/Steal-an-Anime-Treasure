@@ -28,6 +28,25 @@ AnimeConfig.World = {
 	ModelsFolderName = "Models", -- ReplicatedStorage.Models
 	BossModelsFolderName = "Bosses", -- Models/Bosses/<BossId>
 	CharacterModelsFolderName = "Characters", -- Models/Characters/<SeriesId>/<CharacterId>
+	TreasureModelsFolderName = "Treasures", -- Models/Treasures/Chest and Models/Treasures/DirtMound
+}
+
+-- Phase 4 digging with the Pickaxe. The server checks every hit; the client only plays visuals.
+AnimeConfig.Dig = {
+	ToolName = "Pickaxe", -- the existing StarterPack Tool (shown in hotbar slot 1)
+	SwingCooldownSeconds = 0.45, -- client: fastest the Pickaxe can swing
+	MinHitIntervalSeconds = 0.35, -- server: hits closer together than this are ignored
+	MaxHitDistance = 12, -- server: studs from the dig node
+	ClaimTimeoutSeconds = 10, -- the first hitter's claim lapses after this long without a hit
+	ClaimMaxDistance = 25, -- ...or if they walk this far from the node
+	EmergeSeconds = 1.2, -- chest pop-out animation before it lands on the digger's head
+	SwingAnimationId = "rbxassetid://0", -- TODO(asset): pickaxe swing animation (procedural swing until set)
+}
+
+AnimeConfig.Chest = {
+	CarryScale = 0.55, -- chest size above the carrier's head
+	PlotScale = 0.8, -- chest size on the plot
+	OpenAnimationSeconds = 1.2, -- lid opening + coin pop before the character appears
 }
 
 AnimeConfig.Economy = {
@@ -111,7 +130,7 @@ AnimeConfig.Bosses = {
 		Rarity = "Common", -- boss tier label; the chest rarity comes from RarityWeights
 		Stage = 1, -- Main_Index: Stage 1 / Anime Series 1
 		TreasureName = "Tier 1 Anime Treasure",
-		DigTimeSeconds = 3,
+		DigHitsRequired = 3, -- Pickaxe hits to dig the chest out (replaces DigTimeSeconds)
 
 		-- 2. Wake-Up, Chase & Telegraph Skill
 		DefaultState = "Sleeping",
@@ -131,7 +150,8 @@ AnimeConfig.Bosses = {
 		BossModelName = "TBD", -- TODO: real boss model (loads Models/Bosses/Boss_01; grey-box until then)
 		TreasureModelName = "TBD", -- TODO: real treasure model (gold block until then)
 		TelegraphColor = "Red",
-		DigSoundId = "rbxassetid://0", -- TODO: dig sound
+		HitSoundId = "rbxassetid://0", -- TODO(asset): pickaxe hit sound
+		EmergeSoundId = "rbxassetid://0", -- TODO(asset): chest emerge sound
 		WakeUpSoundId = "rbxassetid://0", -- TODO: boss wake-up roar
 		TelegraphSoundId = "rbxassetid://0", -- TODO: telegraph warning sound
 		SkillHitSoundId = "rbxassetid://0", -- TODO: skill impact sound
@@ -195,7 +215,7 @@ end
 -- Validation (runs once on require) ----------------------------------------
 
 local REQUIRED_KEYS = {
-	"BossId", "DisplayName", "Rarity", "TreasureName", "DigTimeSeconds",
+	"BossId", "DisplayName", "Rarity", "TreasureName", "DigHitsRequired",
 	"WalkSpeed", "ReturnToSleepSeconds", "SkillPattern", "SkillCooldownSeconds",
 	"TelegraphWarningSeconds", "SkillRadiusStuds", "SkillDamage",
 	"OpensInto", "OpenTimeSeconds", "RarityWeights",

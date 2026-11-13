@@ -1,40 +1,50 @@
--- Carry: placeholder treasure part + welding it above a character's head.
+-- Carry: the treasure chest a player carries, and the chests shown on plots.
+-- Uses ReplicatedStorage/Models/Treasures/Chest (see TreasureModels), tinted by rarity.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local AnimeConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("AnimeConfig"))
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local AnimeConfig = require(Shared:WaitForChild("AnimeConfig"))
+local TreasureModels = require(Shared:WaitForChild("TreasureModels"))
 
 local Carry = {}
 
-local TREASURE_SIZE = Vector3.new(2.4, 1.8, 1.8)
-local TREASURE_COLOR = Color3.fromRGB(255, 200, 40)
+local LABEL_NAME = "TreasureLabel"
+local HEAD_GAP = 0.6 -- studs between the head and the bottom of the carried chest
 
--- Placeholder until TreasureModelName has a real model.
--- rarityName is the chest rarity rolled at dig time (falls back to the boss tier).
-function Carry.MakeTreasure(cfg, rarityName)
+-- Returns a chest model tinted to rarityName (falls back to the boss tier) with a name label.
+-- opts.Scale (default 1); opts.Anchored = true for display chests, false (default) to carry.
+function Carry.MakeTreasure(cfg, rarityName, opts)
+	opts = opts or {}
 	rarityName = rarityName or cfg.Rarity
 	local rarity = AnimeConfig.Rarities[rarityName]
 
-	local part = Instance.new("Part")
-	part.Name = "Treasure_" .. cfg.BossId
-	part.Size = TREASURE_SIZE
-	part.Material = Enum.Material.Neon
-	part.Color = TREASURE_COLOR
-	part.CanCollide = false
-	part.CanQuery = false
-	part.CanTouch = false
-	part.CastShadow = false
-	part.Massless = true
+	local model = TreasureModels.Chest()
+	model.Name = "Treasure_" .. cfg.BossId
+	if opts.Scale and opts.Scale ~= 1 then
+		model:ScaleTo(opts.Scale)
+	end
+	TreasureModels.ApplyRarity(model, rarityName)
 
-	local highlight = Instance.new("Highlight")
-	highlight.FillTransparency = 1
-	highlight.OutlineColor = rarity.Color
-	highlight.Parent = part
+	local anchored = opts.Anchored == true
+	TreasureModels.SetDecorative(model, anchored)
+	local root = model.PrimaryPart
+	if not anchored then
+		for _, descendant in ipairs(model:GetDescendants()) do
+			if descendant:IsA("BasePart") and descendant ~= root then
+				local weld = Instance.new("WeldConstraint")
+				weld.Part0 = root
+				weld.Part1 = descendant
+				weld.Parent = descendant
+			end
+		end
+	end
 
 	local billboard = Instance.new("BillboardGui")
+	billboard.Name = LABEL_NAME
 	billboard.Size = UDim2.fromOffset(200, 24)
-	billboard.StudsOffset = Vector3.new(0, 2, 0)
+	billboard.StudsOffset = Vector3.new(0, 2.2, 0)
 	billboard.MaxDistance = 120
-	billboard.Parent = part
+	billboard.Parent = root
 
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.fromScale(1, 1)
@@ -46,22 +56,27 @@ function Carry.MakeTreasure(cfg, rarityName)
 	label.Text = ("%s [%s]"):format(cfg.TreasureName, rarityName)
 	label.Parent = billboard
 
-	return part
+	return model
 end
 
--- Welds the treasure above the character's head. Returns false if there is no head.
+function Carry.GetLabel(model)
+	local billboard = model.PrimaryPart and model.PrimaryPart:FindFirstChild(LABEL_NAME)
+	return billboard and billboard:FindFirstChildOfClass("TextLabel")
+end
+
+-- Welds the chest above the character's head. Returns false if there is no head.
 function Carry.AttachToCharacter(character, treasure)
 	local head = character:FindFirstChild("Head")
 	if not head then
 		return false
 	end
-	treasure.Anchored = false
-	treasure.CFrame = head.CFrame * CFrame.new(0, head.Size.Y / 2 + treasure.Size.Y / 2 + 1, 0)
+	local root = treasure.PrimaryPart
+	treasure:PivotTo(head.CFrame * CFrame.new(0, head.Size.Y / 2 + HEAD_GAP + root.Size.Y / 2, 0))
 
 	local weld = Instance.new("WeldConstraint")
 	weld.Part0 = head
-	weld.Part1 = treasure
-	weld.Parent = treasure
+	weld.Part1 = root
+	weld.Parent = root
 
 	treasure.Parent = character
 	return true

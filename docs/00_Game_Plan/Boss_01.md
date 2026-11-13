@@ -6,7 +6,7 @@
 - AnimeSeries: "Series_01"
 - Rarity: "Common"
 - TreasureName: "Tier 1 Anime Treasure"
-- DigTimeSeconds: 3
+- DigHitsRequired: 3 (Pickaxe hits; replaces DigTimeSeconds)
 
 ## 2. Wake-Up, Chase & Telegraph Skill (Scales by Rarity/Stage)
 - DefaultState: "Sleeping"
@@ -26,9 +26,10 @@
 
 ## 4. Assets, VFX & SFX (ElevenLabs / Studio)
 - BossModelName: "TBD"
-- TreasureModelName: "TBD"
+- TreasureModelName: "TBD" (loads ReplicatedStorage/Models/Treasures/Chest)
 - TelegraphColor: "Red"
-- DigSoundId: "rbxassetid://0"
+- HitSoundId: "rbxassetid://0"
+- EmergeSoundId: "rbxassetid://0"
 - WakeUpSoundId: "rbxassetid://0"
 - TelegraphSoundId: "rbxassetid://0"
 - SkillHitSoundId: "rbxassetid://0"
