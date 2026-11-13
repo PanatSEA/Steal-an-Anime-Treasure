@@ -58,14 +58,14 @@ AnimeConfig.Bosses = {
 		-- 2. Wake-Up, Chase & Telegraph Skill
 		DefaultState = "Sleeping",
 		TriggerCondition = "OnDigCompleted",
-		WalkSpeed = 16,
+		WalkSpeed = 18, -- player default is 16, so the boss slowly gains
 		ChaseStopInSafeZone = true,
 		ReturnToSleepSeconds = 8.0, -- max time to walk home before snapping back asleep
 		SkillPattern = "CircleTelegraph",
 		SkillCooldownSeconds = 3.5,
 		TelegraphWarningSeconds = 1.5,
 		SkillRadiusStuds = 18,
-		SkillDamage = 100,
+		SkillDamage = 25, -- 4 hits to kill a 100 HP player
 		DropTreasureOnHit = true,
 
 		-- 4. Assets, VFX & SFX

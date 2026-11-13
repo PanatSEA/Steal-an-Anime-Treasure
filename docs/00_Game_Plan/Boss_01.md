@@ -13,14 +13,14 @@
 ## 2. Wake-Up, Chase & Telegraph Skill (Scales by Rarity/Stage)
 - DefaultState: "Sleeping"
 - TriggerCondition: "OnDigCompleted"
-- WalkSpeed: 16
+- WalkSpeed: 18
 - ChaseStopInSafeZone: true
 - ReturnToSleepSeconds: 8.0
 - SkillPattern: "CircleTelegraph"
 - SkillCooldownSeconds: 3.5
 - TelegraphWarningSeconds: 1.5
 - SkillRadiusStuds: 18
-- SkillDamage: 100
+- SkillDamage: 25
 - DropTreasureOnHit: true
 
 ## 3. Scaling Rule for Higher Bosses (Boss_02, Boss_03+)
