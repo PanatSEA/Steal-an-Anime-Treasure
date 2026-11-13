@@ -19,7 +19,8 @@ Design specs live in the Obsidian vault in [`docs/`](docs/00_Game_Plan/Main_Inde
 | --- | --- |
 | `src/ReplicatedStorage/Shared/AnimeConfig.lua` | `ReplicatedStorage.Shared.AnimeConfig` (ModuleScript) |
 | `src/ServerScriptService/TreasureGame/TreasureServer.server.lua` | `ServerScriptService.TreasureGame.TreasureServer` (Script) |
-| `src/ServerScriptService/TreasureGame/*.lua` | ModuleScripts beside it: `BossController`, `SkillPatterns`, `Carry`, `Zones`, `Sfx` |
+| `src/ServerScriptService/TreasureGame/*.lua` | ModuleScripts beside it: `BossController`, `SkillPatterns`, `PlotService`, `Carry`, `Zones`, `Sfx` |
+| `src/StarterPlayer/StarterPlayerScripts/OwnerOnlyPrompts.client.lua` | `StarterPlayer.StarterPlayerScripts.OwnerOnlyPrompts` (LocalScript) |
 | `tools/BuildPhase1World.luau` | Run in the Studio command bar to (re)build `Workspace.TreasureGame` |
 
 ## Adding Boss_02 / Boss_03

@@ -1,4 +1,4 @@
-# Core Rules (as built in Phase 2)
+# Core Rules (as built in Phase 3)
 
 What the game does today. Edit the **Planned** lines to set the rules for later phases.
 
@@ -15,16 +15,24 @@ What the game does today. Edit the **Planned** lines to set the rules for later 
 - The server decides all hits, damage and drops.
 
 ## Plot assignment
-- **Now:** none. All 8 lobby plots are shared; standing on any plot banks the treasure.
-- **Planned (Phase 3):** one plot per player; only your own plot banks.
+- On join you get the first free plot (Place1 → Place8). Its sign shows "<Name>'s Plot x/8".
+- Only your own plot banks treasure. Other plots do nothing.
+- Leaving frees the plot and removes everything on it. A 9th player gets no plot.
+
+## Banking & slots
+- Standing on your plot while carrying puts the treasure in a free slot (`PlotSlots` = 8).
+- Plot full → the treasure stays on your head and the sign shows "Plot full! Sell a treasure".
+- `Treasures` leaderstat = treasures on your plot right now.
 
 ## Income (`IncomePerSecond`)
-- **Now:** not paid. Banking only adds +1 to the `Treasures` leaderstat. No currency exists yet.
-- **Planned (Phase 3):** banked treasures pay `IncomePerSecond` into Cash.
+- Every banked treasure pays `IncomePerSecond` into **Cash** once per second (`IncomeTickSeconds`).
 
 ## Selling (`SellPrice`)
-- **Now:** not implemented.
-- **Planned (Phase 3):** sell a banked treasure for `SellPrice` Cash.
+- Hold **E** (`SellHoldSeconds` = 0.5) on a treasure on your plot → +`SellPrice` Cash, slot freed.
+- Only the owner sees and can use the Sell prompt.
+
+## Saving
+- Session only: Cash, plot and banked treasures reset when you leave.
 
 ## Losing the treasure
 - Hit by a boss skill, dying, respawning, or leaving the game → treasure is gone and returns to its dig site.

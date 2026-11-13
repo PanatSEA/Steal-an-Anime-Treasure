@@ -24,6 +24,14 @@ AnimeConfig.World = {
 	PlotPartName = "Plot",
 }
 
+-- Phase 3 economy. Session only: Cash and banked treasures reset when a player leaves.
+AnimeConfig.Economy = {
+	StartingCash = 0,
+	PlotSlots = 8, -- banked treasures one plot can hold
+	IncomeTickSeconds = 1, -- every tick, each banked treasure pays IncomePerSecond * tick
+	SellHoldSeconds = 0.5, -- hold E on a banked treasure to sell it for SellPrice
+}
+
 AnimeConfig.Rarities = {
 	Common = { Order = 1, Color = Color3.fromRGB(200, 200, 200) },
 	Rare = { Order = 2, Color = Color3.fromRGB(70, 140, 255) },

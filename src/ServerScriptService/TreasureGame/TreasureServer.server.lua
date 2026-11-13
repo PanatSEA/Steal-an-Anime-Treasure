@@ -1,6 +1,7 @@
--- TreasureServer: Phase 1 core loop.
+-- TreasureServer: core loop.
 -- Dig (hold E) -> carry treasure above head -> boss wakes and chases with
--- telegraphed skills -> reach your base plot in the SAFE ZONE to bank it.
+-- telegraphed skills -> reach YOUR base plot in the SAFE ZONE to bank it.
+-- Banked treasures pay income and can be sold (PlotService).
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,6 +11,7 @@ local Zones = require(script.Parent.Zones)
 local Carry = require(script.Parent.Carry)
 local Sfx = require(script.Parent.Sfx)
 local BossController = require(script.Parent.BossController)
+local PlotService = require(script.Parent.PlotService)
 
 local World = AnimeConfig.World
 local gameFolder = Workspace:WaitForChild(World.GameFolderName)
@@ -27,10 +29,8 @@ local DELIVERY_TICK = 0.2
 -- [Player] = { Site = site, Part = BasePart }
 local carrying = {}
 
-local function getTreasureStat(player)
-	local leaderstats = player:FindFirstChild("leaderstats")
-	return leaderstats and leaderstats:FindFirstChild("Treasures")
-end
+PlotService.Init()
+PlotService.StartIncome()
 
 local function setSiteAvailable(site, available)
 	site.Available = available
@@ -52,10 +52,9 @@ local function releaseTreasure(player, reason)
 end
 
 local function deliver(player)
-	releaseTreasure(player, "banked")
-	local stat = getTreasureStat(player)
-	if stat then
-		stat.Value += 1
+	local entry = carrying[player]
+	if entry and PlotService.TryBank(player, entry.Site.Config) then
+		releaseTreasure(player, "banked")
 	end
 end
 
@@ -137,17 +136,26 @@ local function onCharacterAdded(player, character)
 	end)
 end
 
+local function addStat(leaderstats, name, value)
+	if not leaderstats:FindFirstChild(name) then
+		local stat = Instance.new("IntValue")
+		stat.Name = name
+		stat.Value = value
+		stat.Parent = leaderstats
+	end
+end
+
 local function onPlayerAdded(player)
-	if not player:FindFirstChild("leaderstats") then
-		local leaderstats = Instance.new("Folder")
+	local leaderstats = player:FindFirstChild("leaderstats")
+	if not leaderstats then
+		leaderstats = Instance.new("Folder")
 		leaderstats.Name = "leaderstats"
 		leaderstats.Parent = player
 	end
-	if not getTreasureStat(player) then
-		local stat = Instance.new("IntValue")
-		stat.Name = "Treasures"
-		stat.Parent = player.leaderstats
-	end
+	addStat(leaderstats, "Cash", AnimeConfig.Economy.StartingCash)
+	addStat(leaderstats, "Treasures", 0) -- treasures banked on your plot right now
+	PlotService.Assign(player)
+
 	player.CharacterAdded:Connect(function(character)
 		onCharacterAdded(player, character)
 	end)
@@ -165,15 +173,17 @@ end
 Players.PlayerAdded:Connect(onPlayerAdded)
 Players.PlayerRemoving:Connect(function(player)
 	releaseTreasure(player, "dropped (left)")
+	PlotService.Release(player)
 end)
 
--- Phase 1: any base plot banks the treasure (plot ownership comes later).
+-- Only your own plot banks the treasure.
 task.spawn(function()
 	while true do
 		for player, _ in pairs(carrying) do
 			local character = player.Character
 			local root = character and character:FindFirstChild("HumanoidRootPart")
-			if root and Zones.FindPlotAt(root.Position) then
+			local plotPart = root and Zones.FindPlotAt(root.Position)
+			if plotPart and PlotService.IsOwnPlot(player, plotPart) then
 				deliver(player)
 			end
 		end
