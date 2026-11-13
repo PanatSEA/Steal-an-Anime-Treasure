@@ -14,7 +14,7 @@ BossController.__index = BossController
 local CHASE_TICK = 0.15
 local RETURN_TICK = 0.25
 local FIRST_SKILL_DELAY = 1
-local PLACEHOLDER_COLOR = Color3.fromRGB(90, 40, 120)
+local GREYBOX_COLOR = Color3.fromRGB(163, 162, 165)
 
 local STATE_TEXT = {
 	Sleeping = "Zzz... Sleeping",
@@ -22,11 +22,11 @@ local STATE_TEXT = {
 	Returning = "Returning...",
 }
 
--- Placeholder boss until BossModelName has a real model.
+-- Grey-box boss. TODO: swap for the real model once cfg.BossModelName is set.
 local function buildPlaceholderModel(cfg)
 	local description = Instance.new("HumanoidDescription")
 	for _, key in ipairs({ "HeadColor", "TorsoColor", "LeftArmColor", "RightArmColor", "LeftLegColor", "RightLegColor" }) do
-		description[key] = PLACEHOLDER_COLOR
+		description[key] = GREYBOX_COLOR
 	end
 	description.HeightScale = 1.4
 	description.WidthScale = 1.4
@@ -181,19 +181,19 @@ function BossController:_chaseLoop()
 	end
 end
 
--- Walks home; snaps back asleep if it takes longer than ReturnToSleepSeconds.
+-- Walks home and falls asleep exactly ReturnToSleepSeconds after the chase ends
+-- (waits at home if it arrives early, snaps home if it is still walking).
 function BossController:_returnHome()
 	self:_setState("Returning")
 	self.Target = nil
 	local home = self:_homeCFrame().Position
-	local deadline = os.clock() + self.Config.ReturnToSleepSeconds
+	local sleepAt = os.clock() + self.Config.ReturnToSleepSeconds
 
-	while self.State == "Returning" and os.clock() < deadline do
+	while self.State == "Returning" and os.clock() < sleepAt do
 		local flat = (self.Root.Position - home) * Vector3.new(1, 0, 1)
-		if flat.Magnitude < 3 then
-			break
+		if flat.Magnitude >= 3 then
+			self.Humanoid:MoveTo(home)
 		end
-		self.Humanoid:MoveTo(home)
 		task.wait(RETURN_TICK)
 	end
 

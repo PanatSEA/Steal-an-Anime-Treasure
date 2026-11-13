@@ -60,7 +60,7 @@ AnimeConfig.Bosses = {
 		TriggerCondition = "OnDigCompleted",
 		WalkSpeed = 18, -- player default is 16, so the boss slowly gains
 		ChaseStopInSafeZone = true,
-		ReturnToSleepSeconds = 8.0, -- max time to walk home before snapping back asleep
+		ReturnToSleepSeconds = 8.0, -- boss falls asleep this long after the chase ends
 		SkillPattern = "CircleTelegraph",
 		SkillCooldownSeconds = 3.5,
 		TelegraphWarningSeconds = 1.5,
@@ -69,14 +69,15 @@ AnimeConfig.Bosses = {
 		DropTreasureOnHit = true,
 
 		-- 4. Assets, VFX & SFX
-		BossModelName = "TBD",
-		TreasureModelName = "TBD",
+		-- Placeholders are skipped at runtime (see IsPlaceholderAsset).
+		BossModelName = "TBD", -- TODO: real boss model (grey-box rig until then)
+		TreasureModelName = "TBD", -- TODO: real treasure model (gold block until then)
 		TelegraphColor = "Red",
-		DigSoundId = "rbxassetid://0",
-		WakeUpSoundId = "rbxassetid://0",
-		TelegraphSoundId = "rbxassetid://0",
-		SkillHitSoundId = "rbxassetid://0",
-		SkillVFXName = "TBD",
+		DigSoundId = "rbxassetid://0", -- TODO: dig sound
+		WakeUpSoundId = "rbxassetid://0", -- TODO: boss wake-up roar
+		TelegraphSoundId = "rbxassetid://0", -- TODO: telegraph warning sound
+		SkillHitSoundId = "rbxassetid://0", -- TODO: skill impact sound
+		SkillVFXName = "TBD", -- TODO: skill strike VFX
 	},
 }
 
