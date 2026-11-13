@@ -3,8 +3,9 @@
 --   * every BasePart: Anchored = false, CanCollide = false, Massless = true
 --   * CanTouch = false on everything except Handle
 --   * every part welded to Handle with a WeldConstraint (legacy Welds replaced, offsets kept)
---   * Grip set so the right hand holds the shaft a quarter of the way up, shaft pointing
---     up and ~20 degrees forward, clear of the legs, head and ground
+--   * Grip is rotation only: the Handle (already on the shaft, near its bottom end) stays
+--     centred in the hand, and the shaft points forward and ~35 degrees up with the
+--     crescent head out in front ("ready to dig"), clear of the legs, head and ground
 --   * CanBeDropped = false (the Pickaxe lives in hotbar slot 1)
 -- The server also re-applies the physics rules at runtime (InventoryService + HeldPhysics).
 
@@ -14,10 +15,10 @@ local handle = tool:FindFirstChild("Handle")
 assert(handle and handle:IsA("BasePart"), "Pickaxe has no Handle")
 
 local GRIP = CFrame.new(
-	0.0593, 1.0669, -1.1548,
-	0.997982, 0.007512, -0.063055,
-	-0.054351, 0.614549, -0.787004,
-	0.032838, 0.788842, 0.613717
+	0, 0, 0,
+	0.996842622756958, -0.0028636548668146133, -0.07935161143541336,
+	-0.06083762273192406, 0.6146564483642578, -0.7864454388618469,
+	0.051026105880737305, 0.7887897491455078, 0.6125415563583374
 )
 
 -- Replace legacy joints to Handle with WeldConstraints, keeping each part where it is.
