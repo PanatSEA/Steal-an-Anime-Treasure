@@ -12,6 +12,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
 
 local AnimeConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("AnimeConfig"))
+local TreasureModels = require(ReplicatedStorage.Shared:WaitForChild("TreasureModels"))
 local Carry = require(script.Parent.Carry)
 local ModelLoader = require(script.Parent.ModelLoader)
 local Roll = require(script.Parent.Roll)
@@ -36,7 +37,7 @@ local CHEST_COLUMNS = 5
 local CHEST_ROWS_PER_LAYER = 3
 local CHEST_SPACING = Vector2.new(8, 7)
 local CHEST_ROW_Z = 6 -- first chest row, front half of the plot
-local CHEST_LAYER_HEIGHT = 2.2
+local CHEST_LAYER_GAP = 0.2 -- studs between stacked chest layers
 
 local PlotService = {}
 
@@ -195,7 +196,8 @@ local function chestCFrame(plot, index, model)
 	local row = inLayer // CHEST_COLUMNS
 	local x = (col - (CHEST_COLUMNS - 1) / 2) * CHEST_SPACING.X
 	local z = CHEST_ROW_Z + row * CHEST_SPACING.Y
-	local y = plotTop(plot) + model.PrimaryPart.Size.Y / 2 + 0.05 + layer * CHEST_LAYER_HEIGHT
+	local y = plotTop(plot) + TreasureModels.PivotHeight(model) + 0.05
+		+ layer * (TreasureModels.Height(model) + CHEST_LAYER_GAP)
 	return plot.Part.CFrame * CFrame.new(x, y, z)
 end
 

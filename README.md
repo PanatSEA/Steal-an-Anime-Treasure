@@ -23,10 +23,11 @@ Design specs live in the Obsidian vault in [`docs/`](docs/00_Game_Plan/Main_Inde
 | `src/ReplicatedStorage/Shared/TreasureModels.lua` | `ReplicatedStorage.Shared.TreasureModels` (ModuleScript, server + client) |
 | `src/StarterPlayer/StarterPlayerScripts/*.client.lua` | LocalScripts: `DigClient` (Pickaxe + dig visuals), `ChestFx` (lid + coins), `OwnerOnlyPrompts` |
 | `tools/FixPickaxeTool.luau` | Run in the Studio command bar to apply the held-tool physics rules and grip to `StarterPack.Pickaxe` |
-| `tools/BuildPhase4Models.luau` | Run in the Studio command bar to (re)build `ReplicatedStorage.Models.Treasures.Chest` and `DirtMound` |
+| `tools/BuildPhase4Models.luau` | Run in the Studio command bar to (re)build `ReplicatedStorage.Models.Treasures.DirtMound` (never touches the chest) |
+| `tools/PrepareChestModel.luau` | Run in the Studio command bar after dropping in a new `Models.Treasures.Chest` |
 | `src/ReplicatedStorage/Assets/Items/CharacterItemDefinitions.lua` | `ReplicatedStorage.Assets.Items.CharacterItemDefinitions`, called by a 2-line hook in the existing `ItemDefinitions` (not in this repo) |
 
-Models are loaded by name from `ReplicatedStorage.Models.Bosses.<BossId>`, `ReplicatedStorage.Models.Characters.<SeriesId>.<CharacterId>` and `ReplicatedStorage.Models.Treasures.<Chest|DirtMound>`; missing ones fall back to placeholders. A replacement chest needs a `Base` PrimaryPart, `Trim` parts and a `Lid` model pivoted on its hinge; a replacement mound needs a `Root` PrimaryPart at ground level and `Chunk` parts.
+Models are loaded by name from `ReplicatedStorage.Models.Bosses.<BossId>`, `ReplicatedStorage.Models.Characters.<SeriesId>.<CharacterId>` and `ReplicatedStorage.Models.Treasures.<Chest|DirtMound>`; missing ones fall back to placeholders (the part-built chest lives in `TreasureModels`). A new chest model: drop it in, then run `tools/PrepareChestModel.luau` (Root PrimaryPart with the pivot at the bottom centre, front facing −Z, everything welded and non-colliding, 3.3 studs wide). An optional `Lid` model pivoted on its back hinge opens with a lid animation; a single-mesh chest opens with a burst. Rarity is a glow (halo, light, aura: Common white, Epic purple, Legendary gold, Secret rainbow), never a repaint. A replacement mound needs a `Root` PrimaryPart at ground level and `Chunk` parts.
 | `tools/BuildPhase1World.luau` | Run in the Studio command bar to (re)build `Workspace.TreasureGame` |
 
 ## Adding Boss_02 / Boss_03

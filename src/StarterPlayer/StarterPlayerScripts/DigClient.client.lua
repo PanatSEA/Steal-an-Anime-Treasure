@@ -9,6 +9,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 local Workspace = game:GetService("Workspace")
+local CollectionService = game:GetService("CollectionService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local AnimeConfig = require(Shared:WaitForChild("AnimeConfig"))
@@ -23,7 +24,7 @@ local digSites = Workspace:WaitForChild(World.GameFolderName):WaitForChild(World
 local DUST_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 local SPARKLE_TEXTURE = "rbxasset://textures/particles/sparkles_main.dds"
 local IDLE_EFFECT_SECONDS = 3.5
-local BURIED_DEPTH = 1.05 -- studs below its resting height the chest starts (hit 1 and 2 each lift a third)
+local BURIED_DEPTH_FRACTION = 0.45 -- the chest starts this much of its height underground (hits 1 and 2 each lift a third)
 local BURIED_TILT = Vector2.new(10, 18) -- degrees (X, Z) so a lid corner pokes out of the mound
 local FINAL_MOUND_SCALE = 0.45 -- mound size just before the last hit
 local POP_HEIGHT = 3
@@ -109,9 +110,10 @@ end
 
 -- Chest pose: progress 0 = buried with a corner showing, 1 = resting on the ground.
 local function chestPose(view, chest, progress)
-	local rest = chest.PrimaryPart.Size.Y / 2
+	local rest = TreasureModels.PivotHeight(chest) -- 0 when the chest's pivot is at its bottom
+	local depth = TreasureModels.Height(chest) * BURIED_DEPTH_FRACTION
 	local tilt = 1 - progress
-	return CFrame.new(view.Ground + Vector3.new(0, rest - BURIED_DEPTH * (1 - progress), 0))
+	return CFrame.new(view.Ground + Vector3.new(0, rest - depth * (1 - progress), 0))
 		* FACING
 		* CFrame.Angles(math.rad(BURIED_TILT.X * tilt), 0, math.rad(BURIED_TILT.Y * tilt))
 end
@@ -144,21 +146,21 @@ end
 
 local function buildChest(view, progress)
 	local chest = TreasureModels.Chest()
-	TreasureModels.SetDecorative(chest, true)
 	local rarity = view.Model:GetAttribute("Rarity")
 	if rarity then
-		TreasureModels.ApplyRarity(chest, rarity)
+		TreasureModels.ApplyRarityGlow(chest, rarity, true)
 	end
+	TreasureModels.SetDecorative(chest, true)
 	chest:PivotTo(chestPose(view, chest, progress))
 	chest.Parent = view.Folder
 	view.Chest = chest
 end
 
 local function showBeam(view, rarity)
-	local rarityInfo = AnimeConfig.Rarities[rarity]
-	if not rarityInfo then
+	if not AnimeConfig.Rarities[rarity] then
 		return
 	end
+	local color = TreasureModels.GlowColor(rarity)
 	local height = BEAM_HEIGHT[rarity] or 8
 	local beam = Instance.new("Part")
 	beam.Name = "RarityBeam"
@@ -166,7 +168,7 @@ local function showBeam(view, rarity)
 	beam.Size = Vector3.new(height, 1.6, 1.6)
 	beam.CFrame = CFrame.new(view.Ground + Vector3.new(0, height / 2, 0)) * CFrame.Angles(0, 0, math.rad(90))
 	beam.Material = Enum.Material.Neon
-	beam.Color = rarityInfo.Color
+	beam.Color = color
 	beam.Transparency = 1
 	beam.Anchored = true
 	beam.CanCollide = false
@@ -174,10 +176,14 @@ local function showBeam(view, rarity)
 	beam.CanTouch = false
 	beam.CastShadow = false
 	local light = Instance.new("PointLight")
-	light.Color = rarityInfo.Color
+	light.Color = color
 	light.Range = 14
 	light.Brightness = 2
 	light.Parent = beam
+	if TreasureModels.IsRainbow(rarity) then
+		CollectionService:AddTag(beam, TreasureModels.RAINBOW_TAG)
+		CollectionService:AddTag(light, TreasureModels.RAINBOW_TAG)
+	end
 	beam.Parent = view.Folder
 	TweenService:Create(beam, TweenInfo.new(0.3), { Transparency = 0.55 }):Play()
 	view.Beam = beam
@@ -294,7 +300,7 @@ local function playEmerge(view)
 
 	local chest = view.Chest
 	if rarity then
-		TreasureModels.ApplyRarity(chest, rarity)
+		TreasureModels.ApplyRarityGlow(chest, rarity, true)
 		showBeam(view, rarity)
 	end
 	local rest = chestPose(view, chest, 1)
@@ -304,8 +310,11 @@ local function playEmerge(view)
 		moveChest(chest, top, rest, 0.6, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out)
 	end)
 	task.delay(0.15, function()
-		local color = rarity and AnimeConfig.Rarities[rarity] and AnimeConfig.Rarities[rarity].Color or Color3.new(1, 1, 1)
-		view.Sparkle.Color = ColorSequence.new(color)
+		if rarity and TreasureModels.IsRainbow(rarity) then
+			view.Sparkle.Color = TreasureModels.RainbowSequence()
+		else
+			view.Sparkle.Color = ColorSequence.new(TreasureModels.GlowColor(rarity))
+		end
 		view.Sparkle:Emit(45)
 	end)
 	playSound(boss and boss.EmergeSoundId, view.Fx)

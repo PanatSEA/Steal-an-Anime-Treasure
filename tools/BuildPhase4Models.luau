@@ -1,10 +1,9 @@
--- Run once in Studio (Edit mode, command bar) to build the Phase 4 placeholder models:
---   ReplicatedStorage.Models.Treasures.Chest      stylized low-poly chest (wood, metal trim, moss)
+-- Run once in Studio (Edit mode, command bar) to build the Phase 4 placeholder dirt mound:
 --   ReplicatedStorage.Models.Treasures.DirtMound  rounded cartoon dirt mound with rocks and pebbles
--- Safe to re-run: it replaces both models. Replace either with your own model of the same
--- name later. Contract the scripts rely on:
---   Chest:     PrimaryPart "Base" (the lowest part); parts named "Trim" take the rarity colour;
---              a Model "Lid" whose PrimaryPart sits on the back hinge line (front of the chest = -Z).
+-- Safe to re-run: it replaces only DirtMound. It never touches Models/Treasures/Chest
+-- (your own chest model; prepare it with tools/PrepareChestModel.luau). The old
+-- part-built chest now lives in ReplicatedStorage.Shared.TreasureModels as the fallback.
+-- Contract the scripts rely on:
 --   DirtMound: PrimaryPart "Root" at ground level; parts named "Chunk" break off on each hit.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -21,11 +20,9 @@ local function folder(parent, name)
 end
 
 local treasures = folder(folder(ReplicatedStorage, "Models"), "Treasures")
-for _, name in ipairs({ "Chest", "DirtMound" }) do
-	local old = treasures:FindFirstChild(name)
-	if old then
-		old:Destroy()
-	end
+local oldMound = treasures:FindFirstChild("DirtMound")
+if oldMound then
+	oldMound:Destroy()
 end
 
 local function part(props)
@@ -53,45 +50,6 @@ local function blob(props)
 	mesh.Parent = p
 	return p
 end
-
--- Chest ------------------------------------------------------------------------
-local WOOD = Color3.fromRGB(150, 95, 55)
-local WOOD_LIGHT = Color3.fromRGB(170, 110, 62)
-local WOOD_DARK = Color3.fromRGB(110, 68, 38)
-local METAL = Color3.fromRGB(85, 85, 95)
-local GOLD = Color3.fromRGB(255, 200, 60)
-local MOSS = Color3.fromRGB(95, 160, 65)
-
-local chest = Instance.new("Model")
-chest.Name = "Chest"
-
-local base = part({ Name = "Base", Size = Vector3.new(3.2, 1.6, 2.2), CFrame = CFrame.new(0, 0.8, 0), Color = WOOD, Parent = chest })
-for _, y in ipairs({ 0.55, 1.1 }) do
-	part({ Name = "Plank", Size = Vector3.new(3.22, 0.07, 2.22), CFrame = CFrame.new(0, y, 0), Color = WOOD_DARK, Parent = chest })
-end
-for _, x in ipairs({ -1.05, 1.05 }) do
-	part({ Name = "Trim", Size = Vector3.new(0.28, 1.64, 2.26), CFrame = CFrame.new(x, 0.8, 0), Color = METAL, Material = Enum.Material.Metal, Parent = chest })
-end
-part({ Name = "Trim", Size = Vector3.new(3.26, 0.22, 2.26), CFrame = CFrame.new(0, 0.11, 0), Color = METAL, Material = Enum.Material.Metal, Parent = chest })
-part({ Name = "Lock", Size = Vector3.new(0.55, 0.65, 0.15), CFrame = CFrame.new(0, 1.5, -1.17), Color = GOLD, Material = Enum.Material.Metal, Parent = chest })
-part({ Name = "Keyhole", Size = Vector3.new(0.12, 0.22, 0.05), CFrame = CFrame.new(0, 1.45, -1.25), Color = Color3.fromRGB(30, 25, 20), Parent = chest })
-part({ Name = "Moss", Size = Vector3.new(0.14, 0.6, 0.9), CFrame = CFrame.new(1.67, 0.42, 0.4), Color = MOSS, Parent = chest })
-
-local lid = Instance.new("Model")
-lid.Name = "Lid"
-lid.Parent = chest
-local hinge = part({ Name = "LidHinge", Size = Vector3.new(3.3, 0.1, 0.1), CFrame = CFrame.new(0, 1.6, 1.15), Transparency = 1, Parent = lid })
-part({ Name = "LidTop", Size = Vector3.new(3.3, 0.75, 2.3), CFrame = CFrame.new(0, 1.975, 0), Color = WOOD_LIGHT, Parent = lid })
-part({ Name = "LidPlank", Size = Vector3.new(3.32, 0.07, 2.32), CFrame = CFrame.new(0, 2.15, 0), Color = WOOD_DARK, Parent = lid })
-for _, x in ipairs({ -1.05, 1.05 }) do
-	part({ Name = "Trim", Size = Vector3.new(0.3, 0.79, 2.34), CFrame = CFrame.new(x, 1.975, 0), Color = METAL, Material = Enum.Material.Metal, Parent = lid })
-end
-part({ Name = "Moss", Size = Vector3.new(1.0, 0.12, 0.8), CFrame = CFrame.new(-0.55, 2.41, 0.35), Color = MOSS, Parent = lid })
-part({ Name = "Moss", Size = Vector3.new(0.6, 0.1, 0.5), CFrame = CFrame.new(0.5, 2.4, -0.55), Color = MOSS, Parent = lid })
-lid.PrimaryPart = hinge
-
-chest.PrimaryPart = base
-chest.Parent = treasures
 
 -- Dirt mound -------------------------------------------------------------------
 local DIRT = { Color3.fromRGB(120, 78, 45), Color3.fromRGB(132, 86, 50), Color3.fromRGB(105, 68, 40) }
@@ -151,4 +109,4 @@ end
 mound.PrimaryPart = root
 mound.Parent = treasures
 
-return "Built ReplicatedStorage.Models.Treasures.Chest and DirtMound"
+return "Built ReplicatedStorage.Models.Treasures.DirtMound"
