@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local AnimeConfig = require(Shared:WaitForChild("AnimeConfig"))
 local TreasureModels = require(Shared:WaitForChild("TreasureModels"))
+local HeldPhysics = require(script.Parent.HeldPhysics)
 
 local Carry = {}
 
@@ -29,14 +30,7 @@ function Carry.MakeTreasure(cfg, rarityName, opts)
 	TreasureModels.SetDecorative(model, anchored)
 	local root = model.PrimaryPart
 	if not anchored then
-		for _, descendant in ipairs(model:GetDescendants()) do
-			if descendant:IsA("BasePart") and descendant ~= root then
-				local weld = Instance.new("WeldConstraint")
-				weld.Part0 = root
-				weld.Part1 = descendant
-				weld.Parent = descendant
-			end
-		end
+		HeldPhysics.Apply(model, root, false) -- carried: must never push the carrier around
 	end
 
 	local billboard = Instance.new("BillboardGui")

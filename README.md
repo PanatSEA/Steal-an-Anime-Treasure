@@ -19,9 +19,10 @@ Design specs live in the Obsidian vault in [`docs/`](docs/00_Game_Plan/Main_Inde
 | --- | --- |
 | `src/ReplicatedStorage/Shared/AnimeConfig.lua` | `ReplicatedStorage.Shared.AnimeConfig` (ModuleScript) |
 | `src/ServerScriptService/TreasureGame/TreasureServer.server.lua` | `ServerScriptService.TreasureGame.TreasureServer` (Script) |
-| `src/ServerScriptService/TreasureGame/*.lua` | ModuleScripts beside it: `BossController`, `SkillPatterns`, `DigService`, `PlotService`, `PlayerData`, `InventoryService`, `Roll`, `ModelLoader`, `Carry`, `Remotes`, `Zones`, `Sfx` |
+| `src/ServerScriptService/TreasureGame/*.lua` | ModuleScripts beside it: `BossController`, `SkillPatterns`, `DigService`, `HeldPhysics`, `PlotService`, `PlayerData`, `InventoryService`, `Roll`, `ModelLoader`, `Carry`, `Remotes`, `Zones`, `Sfx` |
 | `src/ReplicatedStorage/Shared/TreasureModels.lua` | `ReplicatedStorage.Shared.TreasureModels` (ModuleScript, server + client) |
 | `src/StarterPlayer/StarterPlayerScripts/*.client.lua` | LocalScripts: `DigClient` (Pickaxe + dig visuals), `ChestFx` (lid + coins), `OwnerOnlyPrompts` |
+| `tools/FixPickaxeTool.luau` | Run in the Studio command bar to apply the held-tool physics rules and grip to `StarterPack.Pickaxe` |
 | `tools/BuildPhase4Models.luau` | Run in the Studio command bar to (re)build `ReplicatedStorage.Models.Treasures.Chest` and `DirtMound` |
 | `src/ReplicatedStorage/Assets/Items/CharacterItemDefinitions.lua` | `ReplicatedStorage.Assets.Items.CharacterItemDefinitions`, called by a 2-line hook in the existing `ItemDefinitions` (not in this repo) |
 

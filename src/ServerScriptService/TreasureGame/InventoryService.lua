@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local AnimeConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("AnimeConfig"))
 local PlayerData = require(script.Parent.PlayerData)
 local Remotes = require(script.Parent.Remotes)
+local HeldPhysics = require(script.Parent.HeldPhysics)
 
 local InventoryService = {}
 
@@ -100,8 +101,14 @@ end
 local function watch(player, container)
 	local function changed(child)
 		if child.Name == AnimeConfig.Dig.ToolName then
-			if child:IsA("Tool") and child.CanBeDropped then
+			if child:IsA("Tool") and not child:GetAttribute("HeldPhysicsApplied") then
 				child.CanBeDropped = false -- keep it from being dropped and lost
+				local handle = child:FindFirstChild("Handle")
+				if handle and handle:IsA("BasePart") then
+					-- Same rules as StarterPack, in case the tool model is swapped later.
+					HeldPhysics.Apply(child, handle, true)
+				end
+				child:SetAttribute("HeldPhysicsApplied", true)
 			end
 			queuePush(player)
 		end
