@@ -5,7 +5,9 @@
 --       "Lid" whose PrimaryPart sits on the back hinge gives a lid-opening animation;
 --       without one, chests open with a burst.
 --   ReplicatedStorage/Models/Treasures/DirtMound
---       PrimaryPart "Root" at ground level; parts named "Chunk" or "Crystal" break off on hits.
+--       Built by tools/BuildDirtMound.luau. PrimaryPart "Root" at ground level; parts tagged
+--       with a DigLayer attribute (1 = top) fly off layer by layer on hits; ChestPose0/1/2
+--       attributes place the chest at each stage (see the tool's header).
 -- If a model is missing, a part-built placeholder is used instead (the old chest, with a lid).
 -- Rarity is shown with a glow (soft glow sprite + light + sparkle aura), never by repainting the model.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

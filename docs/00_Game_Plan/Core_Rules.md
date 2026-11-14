@@ -3,10 +3,10 @@
 What the game does today. Values in `code` live in the boss / series notes and AnimeConfig.
 
 ## Dig & carry
-- Each dig node shows a pale rock mound studded with blue crystals, with a chest buried under it (a lid corner pokes out). On an untouched mound a crystal twinkles every few seconds.
+- Each dig node shows a lumpy 3-layer pile of sand-coloured stud blocks (same stud look as the tracks) with loose blocks around it and 3 glowing ice-blue crystal clusters. The chest's lid pokes out of a gap in the top layer. On an untouched mound a crystal twinkles every few seconds. The pile is solid (you can't walk through it).
 - Equip the **Pickaxe** from hotbar slot 1 (press 1) and click near the mound. It takes `DigHitsRequired` hits.
-- Each hit: a pink-white starburst and a big yellow star flash where the pickaxe lands, rock chunks and blue crystals break off and fly, dust puffs out, the mound shrinks, the chest rises about a third, and the digger's camera shakes.
-- Final hit: the chest bursts out of the rock (white flash, orange-gold rays and a golden glow, sparks, flying crystals and rock chips, the emerge sound), pops up and bounces down with a dust ring, and shows the rarity the **server** rolled from `RarityWeights` as a glow and light in the rarity colour. The boss wakes and the chest lands on your head.
+- Each hit: a pink-white starburst and a big yellow star flash where the pickaxe lands, dust puffs out, and the digger's camera shakes. Hit 1 knocks the top layer off, hit 2 the middle layer (with its crystals): the blocks fly outward spinning, land and fade within a second, and the chest rises a step each time.
+- Final hit: the bottom layer and loose blocks burst outward and the chest bursts out (white flash, orange-gold rays and a golden glow, sparks, flying crystals and rock chips, the emerge sound), pops up and bounces down with a dust ring, and shows the rarity the **server** rolled from `RarityWeights` as a glow and light in the rarity colour. The boss wakes and the chest lands on your head.
 - **First hitter claims the dig.** Other players' hits are ignored. The claim lapses after 10s without a hit, if the digger walks 25 studs away, dies or leaves, and the mound grows back.
 - The server checks every hit: Pickaxe equipped, within 12 studs, not faster than one hit per 0.35s. The client only plays visuals.
 - One treasure per dig site at a time; a new mound appears once the boss is asleep again.

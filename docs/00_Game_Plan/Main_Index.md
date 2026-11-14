@@ -34,6 +34,10 @@
 - **Phase 5 "VFX" (branch phase-5-vfx):** the dig and chest moments use 4 KitsBlox VFX packs (`ReplicatedStorage/VFX`) through `VfxPlayer` + `ChestFxPresets`, styled after the reference picture. See [[VFX_Plan]]
   - Replaces the Phase 4 neon light beam, neon halo ring, dust/sparkle emitters and the coin pop; rarity is now a soft glow sprite + light + sparkle aura
   - The mound is pale rock with blue crystals; rock chunks and crystals break off on hits
+- **Phase 5 "Mound" (branch phase-5-mound):** the dig mound rebuilt after `docs/References/DirtMound_Ref.png` by `tools/BuildDirtMound.luau`
+  - 3 layers of sand-coloured "2022 Stud" blocks (40 parts), 7 loose blocks, 3 Neon ice-blue crystal clusters, the chest's lid out of a gap in the top layer
+  - Blocks carry a `DigLayer` attribute: hit 1 knocks off the top layer, hit 2 the middle, hit 3 bursts the rest; the chest rises to the mound's `ChestPose0/1/2` and pops out on hit 3
+  - Flying blocks are local copies on scripted arcs (land, then fade in 1s); the server still only counts hits. The full mound grows back when the node respawns
   - The plot chest prompt reads **Search**; opening adds a thin white light beam
 
 ## Stage 1: Anime Series 1 (3 Bosses)
