@@ -5,7 +5,8 @@
 --     camera), pulsing in size and transparency, with an optional random flicker (Secret)
 --   * Gem light: the chest's one PointLight, on its Gem (or its centre), pulsing with the halo
 --   * Sparkles: an optional VfxPlayer loop around the chest (Legendary gold, Secret dark red)
---   * Sky beam: an optional Beam from the top of the chest straight up, gently pulsing
+--   * Sky beam: an optional Beam from the top of the chest straight up, gently pulsing, with a
+--     quiet BeamHum loop at its foot while it is on
 --   * Shimmer: a quick Highlight flash in the glow colour
 -- Works in Studio edit mode too, so a chest can be previewed from the command bar.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -14,6 +15,7 @@ local TweenService = game:GetService("TweenService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local VfxPlayer = require(Shared:WaitForChild("VfxPlayer"))
 local ChestFxPresets = require(Shared:WaitForChild("ChestFxPresets"))
+local AudioConfig = require(Shared:WaitForChild("AudioConfig"))
 
 local AuraConfig = ChestFxPresets.ChestAura
 local Shimmer = ChestFxPresets.ChestShimmer
@@ -121,8 +123,15 @@ function ChestAura.SetLight(aura, on)
 end
 
 function ChestAura.SetBeam(aura, on)
-	if aura.Beam then
-		aura.Beam.Enabled = on
+	if not aura.Beam then
+		return
+	end
+	aura.Beam.Enabled = on
+	if on and not aura.BeamHum then
+		aura.BeamHum = AudioConfig.Play("BeamHum", aura.Beam.Attachment0, { Looped = true })
+	elseif not on and aura.BeamHum then
+		aura.BeamHum:Destroy()
+		aura.BeamHum = nil
 	end
 end
 

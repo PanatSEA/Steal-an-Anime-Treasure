@@ -33,14 +33,14 @@ Style for every prompt: *cartoon game sound effect, clean, punchy, no music, no 
 
 ## Priority 3: ambience and polish
 
-| Key | When it plays | Length | SoundId | ElevenLabs prompt |
-|---|---|---|---|---|
-| BeamHum | Sky beam loop (Epic+) | 3s loop | rbxassetid://0 | "soft magical energy hum loop, gentle shimmering, seamless loop, game ambience" |
-| MoundRespawn | New mound grows back | 0.6s | rbxassetid://0 | "sand shifting and rising up, soft rumble with a small sparkle, game sound effect" |
-| CashTick | Income added | 0.2s | rbxassetid://0 | "tiny cartoon coin clink, very short, game UI sound" |
-| SafeZoneEnter | Enter safe zone | 0.5s | rbxassetid://0 | "calm soft shield chime, relief, short, game sound effect" |
-| UIClick | Buttons | 0.1s | rbxassetid://0 | "soft cartoon UI button click, short pop" |
-| DesertAmbience | Background on Track_01 | 30s loop | rbxassetid://0 | "light desert wind ambience with distant sand blowing, calm, seamless loop" |
+| Key            | When it plays          | Length   | SoundId                      | ElevenLabs prompt                                                                  |
+| -------------- | ---------------------- | -------- | ---------------------------- | ---------------------------------------------------------------------------------- |
+| BeamHum        | Sky beam loop (Epic+)  | 3s loop  | rbxassetid://109788180216976 | "soft magical energy hum loop, gentle shimmering, seamless loop, game ambience"    |
+| MoundRespawn   | New mound grows back   | 0.6s     | rbxassetid://71520234795064  | "sand shifting and rising up, soft rumble with a small sparkle, game sound effect" |
+| CashTick       | Income added           | 0.2s     | rbxassetid://121758541053378 | "tiny cartoon coin clink, very short, game UI sound"                               |
+| SafeZoneEnter  | Enter safe zone        | 0.5s     | rbxassetid://134919952997653 | "calm soft shield chime, relief, short, game sound effect"                         |
+| UIClick        | Buttons                | 0.1s     | rbxassetid://95740396502829  | "soft cartoon UI button click, short pop"                                          |
+| DesertAmbience | Background on Track_01 | 30s loop | rbxassetid://131963591216655 | "light desert wind ambience with distant sand blowing, calm, seamless loop"        |
 
 ## Volume guide
 - Big moments (Emerge, Open_Legendary/Secret, SkillHit): 0.6–0.8

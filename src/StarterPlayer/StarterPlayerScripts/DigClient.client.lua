@@ -15,7 +15,7 @@
 --     camera shake and Secret's slow-motion) on hit 3, ChestLand when the chest lands,
 --     IdleSparkle while the emerged chest waits to be picked up, MoundTwinkle/MoundPuff on mounds.
 --   * Sounds come from AudioConfig (3D at the mound/chest): DigHit, EmergeSoundId, ChestLand,
---     PickupHold (loops while you hold E on the chest), PickupDone.
+--     PickupHold (loops while you hold E on the chest), PickupDone, MoundRespawn.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -501,6 +501,7 @@ local function playRespawn(view)
 		end
 	end)
 	VfxPlayer.PlayPreset(ChestFxPresets.MoundPuff, aimUp(view.Ground + Vector3.new(0, 0.5, 0)))
+	AudioConfig.Play("MoundRespawn", view.Ground)
 end
 
 -- Nobody picked the chest up in time (PickupTimeoutSeconds): it sinks back into the ground with
