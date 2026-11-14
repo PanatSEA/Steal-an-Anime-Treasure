@@ -45,6 +45,8 @@
   - Glow, sparkles, sky beam (Epic 15 / Legendary 40 / Secret 80 studs), hit-3 burst, camera shake, Secret slow-motion, opening and Secret screen-edge flash per rarity
   - The server announces Secret chests to everyone (red text in chat and a banner)
   - Loops off beyond 150 studs (the Secret beam stays), nearest-first caps on lights and sparkle loops, half particles on mobile
+- **Phase 5 fixes:** the Pickaxe swing now winds up over the shoulder and chops forward and down (it used to swing backward; the grip was fine), and the hit is sent when the pick lands
+  - New pickup flow (Boss_01 `TriggerCondition` = "OnChestPickedUp", `PickupKey` E, `PickupHoldSeconds` 1.0): after hit 3 the chest lands by the mound with the boss asleep; anyone within 8 studs holds E to take it (server-checked), then the boss wakes. Untouched for 60s, the chest sinks back and the mound respawns
   - The plot chest prompt reads **Search**; opening adds a thin white light beam
 
 ## Stage 1: Anime Series 1 (3 Bosses)

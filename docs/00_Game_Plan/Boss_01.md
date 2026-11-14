@@ -10,7 +10,9 @@
 
 ## 2. Wake-Up, Chase & Telegraph Skill (Scales by Rarity/Stage)
 - DefaultState: "Sleeping"
-- TriggerCondition: "OnDigCompleted"
+- TriggerCondition: "OnChestPickedUp" (after hit 3 the chest lands by the mound and the boss stays asleep; it wakes when someone picks the chest up)
+- PickupKey: "E"
+- PickupHoldSeconds: 1.0 (anyone within about 8 studs can pick it up, not only the digger; untouched for 60s, it sinks back and the mound respawns)
 - WalkSpeed: 18
 - ChaseStopInSafeZone: true
 - ReturnToSleepSeconds: 5.0
@@ -29,7 +31,7 @@
 - TreasureModelName: "TBD" (loads ReplicatedStorage/Models/Treasures/Chest)
 - TelegraphColor: "Red"
 - HitSoundId: "rbxassetid://0"
-- EmergeSoundId: "rbxassetid://0"
+- EmergeSoundId: "rbxassetid://125649136159228" (ElevenLabs "Ice magic spell hit", ~2s)
 - WakeUpSoundId: "rbxassetid://0"
 - TelegraphSoundId: "rbxassetid://0"
 - SkillHitSoundId: "rbxassetid://0"

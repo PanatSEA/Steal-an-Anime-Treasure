@@ -16,7 +16,7 @@ Look: styled after the reference picture (a cartoon dig). Each hit shows a pink-
 | Open with E (Search), about 0.6 s | RarityFx[rarity].Open (+ thin white light beam for OpenBeam rarities, Secret's screen-edge flash), then ChestLand under the character | Chests have no lid. The chest squashes about its centre (scale 1 → 1.15 in 0.1 s → 0 in 0.15 s) and the rarity's opening plays as it collapses (see "Rarity effects"). At 0.25 s the server removes the chest and spawns the character, which pops out of the chest's centre (small, growing to full size), arcs 3 studs up and lands on its slot at about 0.6 s with a ChestLand dust ring |
 | Every chest from emerging until it's opened (dig site, carried, on a plot) | RarityFx[rarity] Glow, GemLight, SkyBeam + ChestShimmer (ChestAura) | The rarity's halo behind the chest, its one light on the Gem, its sparkles, its sky beam (not while carried) and a Highlight flash in the glow colour every 3–4 s |
 | Untouched mound | MoundTwinkle | Frost Star on a crystal tip every 1.5 s |
-| Mound grows back | MoundPuff | FistShotVFX_2 BALLLSLSLSL2 dust puffs |
+| Mound grows back (also when an unpicked chest sinks back after 60 s: it slides into the ground first) | MoundPuff | FistShotVFX_2 BALLLSLSLSL2 dust puffs |
 
 ## Rarity colours
 `ChestFxPresets.RarityTint`, matching the chests' trims:

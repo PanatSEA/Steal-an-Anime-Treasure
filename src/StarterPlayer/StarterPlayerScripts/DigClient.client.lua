@@ -6,8 +6,10 @@
 --     sees the same thing and players who join late see the current state.
 --   * Each hit peels a layer off (blocks tagged DigLayer 1 = top), the blocks fly off and fade,
 --     and the chest rises to the mound's next ChestPose. The last hit bursts the rest outward
---     and the chest pops out. The mound and flying blocks are local copies; the server only
---     counts hits.
+--     and the chest pops out and lands by the mound, where anyone nearby can hold E to pick it
+--     up (the server's prompt; the boss wakes then). Left alone for PickupTimeoutSeconds, it
+--     sinks back and the mound grows again. The mound and flying blocks are local copies; the
+--     server only counts hits.
 --   * Effects come from ReplicatedStorage/VFX via VfxPlayer; tune them in ChestFxPresets:
 --     DigHit on hits 1-2, ChestBurstBase + RarityFx[rarity].Burst (+ EmergeSoundId, the rarity's
 --     camera shake and Secret's slow-motion) on hit 3, ChestLand when the chest lands,
@@ -512,6 +514,33 @@ local function playRespawn(view)
 	VfxPlayer.PlayPreset(ChestFxPresets.MoundPuff, aimUp(view.Ground + Vector3.new(0, 0.5, 0)))
 end
 
+-- Nobody picked the chest up in time (PickupTimeoutSeconds): it sinks back into the ground with
+-- a puff of dust, then the full mound grows back.
+local SINK_SECONDS = 0.6
+local function playSinkBack(view)
+	stopIdle(view)
+	local chest = view.Chest
+	view.Chest = nil
+	if chest then
+		CollectionService:RemoveTag(chest, TreasureModels.AURA_TAG)
+		local from = chest:GetPivot()
+		moveChest(chest, from, from - Vector3.new(0, TreasureModels.Height(chest) + 0.3, 0), SINK_SECONDS,
+			Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		Debris:AddItem(chest, SINK_SECONDS + 0.05)
+	end
+	VfxPlayer.PlayPreset(ChestFxPresets.MoundPuff, aimUp(view.Ground + Vector3.new(0, 0.5, 0)))
+	task.delay(SINK_SECONDS, function()
+		if views[view.Model] ~= view then
+			return
+		end
+		if view.State == "Buried" and view.Hits == 0 then
+			playRespawn(view)
+		else
+			render(view) -- someone already started digging the new mound
+		end
+	end)
+end
+
 local function updateLabel(view)
 	local state, hits, required, owner = siteInfo(view.Model)
 	if state ~= "Buried" then
@@ -539,7 +568,9 @@ local function sync(view)
 	elseif state == "Taken" and previousState ~= "Taken" then
 		playTaken(view)
 	elseif state == "Buried" or state == "Locked" then
-		if previousState == "Taken" or previousState == "Emerged" then
+		if previousState == "Emerged" then
+			playSinkBack(view) -- nobody picked it up in time
+		elseif previousState == "Taken" then
 			playRespawn(view)
 		elseif hits > previousHits and hits < required then
 			playHit(view, hits, required)
@@ -671,23 +702,35 @@ local function nearestSite(root)
 	return best
 end
 
--- Procedural swing on the Tool's grip (used until SwingAnimationId is set).
+-- Procedural swing on the Tool's grip (used until SwingAnimationId is set). The Pickaxe is held
+-- upright with its pick tip pointing forward; the swing lifts the head up and back over the
+-- shoulder, chops it forward and down (pick tip first) onto the mound in front, then returns.
+-- Tilt is the head's rotation in the hand: positive leans it back toward the player, negative
+-- brings it forward and down (Grip = base * Rx(-tilt)). The old swing went to +80, behind the player.
+local SWING_WINDUP_DEG, SWING_IMPACT_DEG = 40, -105
+local SWING_WINDUP_SECONDS, SWING_STRIKE_SECONDS, SWING_RECOVER_SECONDS = 0.12, 0.09, 0.18
+
+-- Returns the seconds until the pick lands (the hit is sent then, so the effects match the chop).
 local function proceduralSwing(tool)
 	local base = baseGrips[tool]
 	if not base then
 		base = tool.Grip
 		baseGrips[tool] = base
 	end
-	tweenNumber(0, 1, 0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, function(alpha)
-		tool.Grip = base * CFrame.Angles(math.rad(-80 * alpha), 0, 0)
+	local function setTilt(degrees)
+		tool.Grip = base * CFrame.Angles(math.rad(-degrees), 0, 0)
+	end
+	tweenNumber(0, SWING_WINDUP_DEG, SWING_WINDUP_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, setTilt)
+	task.delay(SWING_WINDUP_SECONDS, function()
+		tweenNumber(SWING_WINDUP_DEG, SWING_IMPACT_DEG, SWING_STRIKE_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.In, setTilt)
 	end)
-	task.delay(0.12, function()
-		tweenNumber(1, 0, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In, function(alpha)
-			tool.Grip = base * CFrame.Angles(math.rad(-80 * alpha), 0, 0)
-		end)
+	task.delay(SWING_WINDUP_SECONDS + SWING_STRIKE_SECONDS, function()
+		tweenNumber(SWING_IMPACT_DEG, 0, SWING_RECOVER_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, setTilt)
 	end)
+	return SWING_WINDUP_SECONDS + SWING_STRIKE_SECONDS
 end
 
+-- Plays the swing; returns the seconds until the pick lands.
 local function playSwing(tool, humanoid)
 	if not AnimeConfig.IsPlaceholderAsset(Dig.SwingAnimationId) then
 		local animator = humanoid:FindFirstChildOfClass("Animator")
@@ -700,10 +743,10 @@ local function playSwing(tool, humanoid)
 				swingTracks[humanoid] = track
 			end
 			track:Play()
-			return
+			return 0
 		end
 	end
-	proceduralSwing(tool)
+	return proceduralSwing(tool)
 end
 
 local hookedTools = setmetatable({}, { __mode = "k" })
@@ -725,12 +768,15 @@ local function hookTool(tool)
 		if not humanoid or not root then
 			return
 		end
-		playSwing(tool, humanoid)
+		local landsIn = playSwing(tool, humanoid)
 		local site = nearestSite(root)
 		if site then
 			local owner = site:GetAttribute("DigOwner") or 0
 			if owner == 0 or owner == localPlayer.UserId then
-				digHit:FireServer(site) -- the server checks everything and may ignore it
+				-- sent when the pick lands; the server checks everything and may ignore it
+				task.delay(landsIn, function()
+					digHit:FireServer(site)
+				end)
 			end
 		end
 	end)

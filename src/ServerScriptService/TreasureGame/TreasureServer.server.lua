@@ -1,7 +1,10 @@
 -- TreasureServer: core loop.
 -- Hit the dirt mound with the Pickaxe (DigService) -> on the final hit the server
--- rolls the chest rarity, the chest pops out and lands on your head -> the boss
--- wakes and chases with telegraphed skills -> reach YOUR plot in the SAFE ZONE ->
+-- rolls the chest rarity and the chest pops out and lands by the mound (boss still
+-- asleep) -> anyone nearby holds E to pick it up; it goes on their head and the boss
+-- wakes and chases with telegraphed skills (Boss TriggerCondition "OnChestPickedUp";
+-- nobody picks it up in PickupTimeoutSeconds -> it sinks back and the mound
+-- respawns) -> reach YOUR plot in the SAFE ZONE ->
 -- it becomes a chest that unlocks, opens into a character and earns Cash
 -- (PlotService). Cash, characters and chests are saved (PlayerData).
 local Players = game:GetService("Players")
@@ -24,6 +27,8 @@ local announce = Remotes.Event("Announce")
 local ANNOUNCED_RARITIES = { Secret = "%s found a SECRET chest!" }
 
 local World = AnimeConfig.World
+local Dig = AnimeConfig.Dig
+local PICKUP_SLACK = 4 -- studs of extra reach the server allows over PickupRange (lag)
 local gameFolder = Workspace:WaitForChild(World.GameFolderName)
 local digSitesFolder = gameFolder:WaitForChild(World.DigSitesFolderName)
 
@@ -68,38 +73,122 @@ end
 local function setSiteAvailable(site, available)
 	site.Available = available
 	if available then
+		site.PendingRarity = nil -- a chest still waiting to be picked up goes back in the ground
+		site.PickupToken = nil
+		if site.PickupPrompt then
+			site.PickupPrompt.Enabled = false
+		end
 		DigService.Reset(site.Model) -- a new mound with a buried chest
 	end
 end
 
--- The server's final hit: roll the rarity, wake the boss, then lift the chest onto the digger.
+local function aliveRoot(player)
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if player.Parent == Players and humanoid and root and humanoid.Health > 0 then
+		return root
+	end
+	return nil
+end
+
+-- The player now carries this site's treasure (the boss chases carriers).
+local function startCarrying(site, player, rarity)
+	local entry = { Site = site, Part = nil, Rarity = rarity }
+	carrying[player] = entry
+	player:SetAttribute("CarryingTreasure", site.Config.BossId)
+	player:SetAttribute("CarryingRarity", rarity)
+	return entry
+end
+
+-- Puts the carried chest model on the player's head.
+local function attachTreasure(player, entry)
+	local treasure = Carry.MakeTreasure(entry.Site.Config, entry.Rarity, { Scale = AnimeConfig.Chest.CarryScale })
+	if player.Character and Carry.AttachToCharacter(player.Character, treasure) then
+		entry.Part = treasure
+	else
+		treasure:Destroy()
+	end
+end
+
+-- "Pick up" (TriggerCondition OnChestPickedUp): the server checks the chest is still there, the
+-- player is alive, close enough and not already carrying one. Anyone can take it, not only the
+-- digger. The first completed hold wins; the boss wakes on the one who took it.
+local function tryPickup(site, player)
+	local rarity = site.PendingRarity
+	if not rarity or carrying[player] then
+		return
+	end
+	local root = aliveRoot(player)
+	if not root or (root.Position - site.Anchor.Position).Magnitude > Dig.PickupRange + PICKUP_SLACK then
+		return
+	end
+	site.PendingRarity = nil
+	site.PickupToken = nil
+	site.PickupPrompt.Enabled = false
+	DigService.SetTaken(site.Model)
+	attachTreasure(player, startCarrying(site, player, rarity))
+	print(("[TreasureGame] %s picked up a %s %s — %s wakes up!"):format(player.Name, rarity, site.Config.TreasureName, site.Config.DisplayName))
+	site.Boss:Wake(player)
+end
+
+local function makePickupPrompt(site)
+	local cfg = site.Config
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "PickupPrompt"
+	prompt.ActionText = "Pick up"
+	prompt.ObjectText = cfg.TreasureName
+	prompt.KeyboardKeyCode = Enum.KeyCode[cfg.PickupKey or "E"] or Enum.KeyCode.E
+	prompt.HoldDuration = cfg.PickupHoldSeconds or 1
+	prompt.MaxActivationDistance = Dig.PickupRange
+	prompt.RequiresLineOfSight = false
+	prompt.Enabled = false
+	prompt.Parent = site.Anchor -- the dig site's invisible anchor, where the chest lands
+	prompt.Triggered:Connect(function(player)
+		tryPickup(site, player)
+	end)
+	return prompt
+end
+
+-- The server's final hit: roll the rarity. With OnChestPickedUp the chest lands by the mound and
+-- waits (boss asleep) for someone to pick it up, or sinks back after PickupTimeoutSeconds. With
+-- OnDigCompleted it goes straight onto the digger's head and the boss wakes.
 local function completeDig(site, player)
 	local cfg = site.Config
 	local rarity = Roll.Rarity(cfg.RarityWeights)
 	site.Available = false
-
-	local entry = { Site = site, Part = nil, Rarity = rarity }
-	carrying[player] = entry
-	player:SetAttribute("CarryingTreasure", cfg.BossId)
-	player:SetAttribute("CarryingRarity", rarity)
-	print(("[TreasureGame] %s dug up a %s %s — %s wakes up!"):format(player.Name, rarity, cfg.TreasureName, cfg.DisplayName))
 	if ANNOUNCED_RARITIES[rarity] then
 		-- The server decides and words it; clients only display it.
 		announce:FireAllClients({ Rarity = rarity, Text = ANNOUNCED_RARITIES[rarity]:format(player.DisplayName) })
 	end
-	site.Boss:Wake(player)
 
+	if cfg.TriggerCondition == "OnChestPickedUp" then
+		print(("[TreasureGame] %s dug up a %s %s — waiting to be picked up"):format(player.Name, rarity, cfg.TreasureName))
+		local token = {}
+		site.PendingRarity = rarity
+		site.PickupToken = token
+		task.delay(Dig.EmergeSeconds, function() -- once every client has seen it land
+			if site.PickupToken == token then
+				site.PickupPrompt.Enabled = true
+			end
+		end)
+		task.delay(Dig.PickupTimeoutSeconds, function()
+			if site.PickupToken == token then
+				print(("[TreasureGame] Nobody picked up the %s chest at %s; it sinks back"):format(rarity, site.Model.Name))
+				setSiteAvailable(site, true) -- the chest sinks back, a new mound grows (DigClient)
+			end
+		end)
+		return rarity
+	end
+
+	local entry = startCarrying(site, player, rarity)
+	print(("[TreasureGame] %s dug up a %s %s — %s wakes up!"):format(player.Name, rarity, cfg.TreasureName, cfg.DisplayName))
+	site.Boss:Wake(player)
 	-- Let every client play the pop-out first, then put the chest on the digger's head.
-	task.delay(AnimeConfig.Dig.EmergeSeconds, function()
+	task.delay(Dig.EmergeSeconds, function()
 		DigService.SetTaken(site.Model)
-		if carrying[player] ~= entry then
-			return -- dropped (hit, died or left) while the chest was popping out
-		end
-		local treasure = Carry.MakeTreasure(cfg, rarity, { Scale = AnimeConfig.Chest.CarryScale })
-		if player.Character and Carry.AttachToCharacter(player.Character, treasure) then
-			entry.Part = treasure
-		else
-			treasure:Destroy()
+		if carrying[player] == entry then -- not dropped (hit, died or left) while it popped out
+			attachTreasure(player, entry)
 		end
 	end)
 	return rarity
@@ -112,7 +201,8 @@ local function setupSite(model)
 		return
 	end
 	local cfg = AnimeConfig.GetBoss(bossId)
-	local site = { Model = model, Config = cfg, Available = false }
+	-- PendingRarity: a dug-up chest waiting by the mound to be picked up (OnChestPickedUp)
+	local site = { Model = model, Config = cfg, Available = false, Anchor = model:WaitForChild("DigMound") }
 
 	DigService.Register(model, cfg, {
 		CanDig = function(player)
@@ -122,6 +212,7 @@ local function setupSite(model)
 			return completeDig(site, player)
 		end,
 	})
+	site.PickupPrompt = makePickupPrompt(site) -- after Register, which clears old prompts off the anchor
 
 	site.Boss = BossController.new(model, cfg, {
 		EffectsFolder = effectsFolder,

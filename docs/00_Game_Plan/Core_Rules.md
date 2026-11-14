@@ -4,14 +4,18 @@ What the game does today. Values in `code` live in the boss / series notes and A
 
 ## Dig & carry
 - Each dig node shows a lumpy 3-layer pile of sand-coloured stud blocks (same stud look as the tracks) with loose blocks around it and 3 glowing ice-blue crystal clusters. The chest's lid pokes out of a gap in the top layer. On an untouched mound a crystal twinkles every few seconds. The pile is solid (you can't walk through it).
-- Equip the **Pickaxe** from hotbar slot 1 (press 1) and click near the mound. It takes `DigHitsRequired` hits.
+- Equip the **Pickaxe** from hotbar slot 1 (press 1) and click near the mound. It takes `DigHitsRequired` hits. Each click swings the pick up over your shoulder and chops it forward and down onto the mound; the hit counts when the pick lands.
 - Each hit: a pink-white starburst and a big yellow star flash where the pickaxe lands, dust puffs out, and the digger's camera shakes. Hit 1 knocks the top layer off, hit 2 the middle layer (with its crystals): the blocks fly outward spinning, land and fade within a second, and the chest rises a step each time.
 - Final hit: the bottom layer and loose blocks burst outward and the chest of the rarity the **server** rolled from `RarityWeights` bursts out (flying crystals, rock chips and dust, the emerge sound), pops up and bounces down with a dust ring. The burst and camera shake grow with rarity:
   - Common: a small white flash.
   - Epic: a purple flash and ring.
   - Legendary: gold flash, rays, big star and sparkles.
   - Secret: red flash, double ring, a strong shake and a short slow-motion hold, and the server announces "[Player] found a SECRET chest!" to everyone in red.
-  The boss wakes and the chest lands on your head.
+  The chest lands on the ground where the mound was, and the boss stays asleep.
+- **Pick up (TriggerCondition `OnChestPickedUp`):** a "Pick up" prompt appears on the chest once it has landed. Hold `PickupKey` (E) for `PickupHoldSeconds` (1s) within `PickupRange` (8 studs).
+  - **Anyone** nearby can take it, not only the digger: that's the stealing part. The server checks the chest is still there and the player is alive, close enough and not already carrying one; the first completed hold wins.
+  - The chest goes on that player's head and the boss wakes and chases them.
+  - Nobody picks it up within `PickupTimeoutSeconds` (60s): it sinks back into the ground and a new mound grows.
 - Every chest glows in its rarity colour from then until it's opened. Its gem lights up, and Legendary and Secret add drifting sparks. Epic, Legendary and Secret show a sky beam (15 / 40 / 80 studs) while the chest waits at the dig site or sits on a plot (not while carried); the Secret beam can be seen across the track.
 - **First hitter claims the dig.** Other players' hits are ignored. The claim lapses after 10s without a hit, if the digger walks 25 studs away, dies or leaves, and the mound grows back.
 - The server checks every hit: Pickaxe equipped, within 12 studs, not faster than one hit per 0.35s. The client only plays visuals.

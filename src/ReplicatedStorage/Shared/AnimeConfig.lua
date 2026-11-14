@@ -39,7 +39,9 @@ AnimeConfig.Dig = {
 	MaxHitDistance = 12, -- server: studs from the dig node
 	ClaimTimeoutSeconds = 10, -- the first hitter's claim lapses after this long without a hit
 	ClaimMaxDistance = 25, -- ...or if they walk this far from the node
-	EmergeSeconds = 1.2, -- chest pop-out animation before it lands on the digger's head
+	EmergeSeconds = 1.2, -- chest pop-out animation; the "Pick up" prompt appears once it has landed
+	PickupRange = 8, -- studs: the "Pick up" prompt's reach (the server allows a little slack for lag)
+	PickupTimeoutSeconds = 60, -- nobody picks the chest up -> it sinks back and the mound respawns
 	SwingAnimationId = "rbxassetid://0", -- TODO(asset): pickaxe swing animation (procedural swing until set)
 }
 
@@ -134,7 +136,11 @@ AnimeConfig.Bosses = {
 
 		-- 2. Wake-Up, Chase & Telegraph Skill
 		DefaultState = "Sleeping",
-		TriggerCondition = "OnDigCompleted",
+		-- "OnChestPickedUp": the chest lands by the mound and anyone nearby can hold PickupKey to
+		-- take it; the boss wakes then. ("OnDigCompleted": straight onto the digger's head, boss wakes.)
+		TriggerCondition = "OnChestPickedUp",
+		PickupKey = "E",
+		PickupHoldSeconds = 1.0,
 		WalkSpeed = 18, -- player default is 16, so the boss slowly gains
 		ChaseStopInSafeZone = true,
 		ReturnToSleepSeconds = 5.0, -- boss falls asleep this long after the chase ends
@@ -151,7 +157,7 @@ AnimeConfig.Bosses = {
 		TreasureModelName = "TBD", -- TODO: real treasure model (gold block until then)
 		TelegraphColor = "Red",
 		HitSoundId = "rbxassetid://0", -- TODO(asset): pickaxe hit sound
-		EmergeSoundId = "rbxassetid://0", -- TODO(asset): chest emerge sound
+		EmergeSoundId = "rbxassetid://125649136159228", -- ElevenLabs "Ice magic spell hit" (~2s), plays on the 3rd hit
 		WakeUpSoundId = "rbxassetid://0", -- TODO: boss wake-up roar
 		TelegraphSoundId = "rbxassetid://0", -- TODO: telegraph warning sound
 		SkillHitSoundId = "rbxassetid://0", -- TODO: skill impact sound
