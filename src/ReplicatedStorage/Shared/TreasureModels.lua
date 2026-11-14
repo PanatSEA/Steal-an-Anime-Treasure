@@ -9,7 +9,8 @@
 --       with a DigLayer attribute (1 = top) fly off layer by layer on hits; ChestPose0/1/2
 --       attributes place the chest at each stage (see the tool's header).
 -- If a model is missing, a part-built placeholder is used instead (the old chest, with a lid).
--- Rarity is shown with a glow (soft glow sprite + light + sparkle aura), never by repainting the model.
+-- Rarity is shown with a sparkle aura in the rarity colour, never by repainting the model. Every
+-- chest also gets the gold aura (halo + light + sparkles + shimmer) on clients via GOLD_AURA_TAG.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
 
@@ -20,6 +21,9 @@ local TreasureModels = {}
 
 TreasureModels.RAINBOW_TAG = "RainbowGlow" -- clients cycle the colour of tagged glow pieces
 TreasureModels.GLOW_NAME = "RarityGlow"
+-- Chests with this tag get the gold aura on every client (ChestGoldAura): halo, light, sparkles,
+-- shimmer. Carry.MakeTreasure tags carried and plot chests; DigClient tags the emerged chest.
+TreasureModels.GOLD_AURA_TAG = "GoldAura"
 
 local GLOW_COLORS = {
 	Common = Color3.fromRGB(255, 255, 255),
@@ -30,7 +34,6 @@ local GLOW_COLORS = {
 local RAINBOW = { Secret = true }
 
 local SPARKLE_TEXTURE = "rbxasset://textures/particles/sparkles_main.dds"
-local GLOW_TEXTURE = "rbxassetid://109223850052778" -- soft glow disc from the PBlue VFX pack ("ring")
 
 local function source(name)
 	local models = ReplicatedStorage:FindFirstChild(World.ModelsFolderName)
@@ -161,8 +164,9 @@ function TreasureModels.RainbowSequence()
 	return ColorSequence.new(points)
 end
 
--- Adds a rarity glow without touching the model's own colours: a soft glow sprite behind
--- the chest, a light and a slow sparkle aura (no parts, so it never affects physics).
+-- Adds a rarity glow without touching the model's own colours: a slow sparkle aura in the
+-- rarity colour (no parts, so it never affects physics). The halo and light behind the chest
+-- are the gold aura (ChestGoldAura, one light per chest), the same for every rarity.
 -- Secret is tagged so clients cycle it through the rainbow. `anchored` is kept for callers
 -- of the old part-based halo and is no longer needed.
 function TreasureModels.ApplyRarityGlow(model, rarityName, _anchored)
@@ -182,17 +186,11 @@ function TreasureModels.ApplyRarityGlow(model, rarityName, _anchored)
 	local rainbow = TreasureModels.IsRainbow(rarityName)
 	local boxCFrame, boxSize = model:GetBoundingBox()
 
-	-- A little above the chest's centre, so the ground doesn't cut the bottom of the glow.
+	-- A little above the chest's centre.
 	local attachment = Instance.new("Attachment")
 	attachment.Name = "GlowAttachment"
 	attachment.Parent = root
 	attachment.WorldPosition = boxCFrame.Position + Vector3.new(0, boxSize.Y * 0.3, 0)
-
-	local light = Instance.new("PointLight")
-	light.Color = color
-	light.Range = math.max(boxSize.X, boxSize.Y) * 3
-	light.Brightness = 2.5
-	light.Parent = attachment
 
 	local aura = Instance.new("ParticleEmitter")
 	aura.Texture = SPARKLE_TEXTURE
@@ -205,35 +203,9 @@ function TreasureModels.ApplyRarityGlow(model, rarityName, _anchored)
 	aura.SpreadAngle = Vector2.new(180, 180)
 	aura.Parent = attachment
 
-	-- Soft glow behind the chest (pushed back towards the camera's far side by ZOffset). Mostly
-	-- normal blending so the colour still shows on bright sand.
-	local glowSize = math.max(boxSize.X, boxSize.Y) * 1.8
-	local glow = Instance.new("ParticleEmitter")
-	glow.Name = "GlowSprite"
-	glow.Texture = GLOW_TEXTURE
-	glow.Color = ColorSequence.new(color)
-	glow.LightEmission = 0.3
-	glow.LightInfluence = 0
-	glow.Brightness = 1.5
-	glow.Size = NumberSequence.new(glowSize)
-	glow.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 1),
-		NumberSequenceKeypoint.new(0.3, 0.5),
-		NumberSequenceKeypoint.new(0.7, 0.5),
-		NumberSequenceKeypoint.new(1, 1),
-	})
-	glow.Lifetime = NumberRange.new(1.2, 1.2)
-	glow.Rate = 3
-	glow.Speed = NumberRange.new(0, 0)
-	glow.LockedToPart = true
-	glow.ZOffset = -1.5
-	glow.Parent = attachment
-
 	model:SetAttribute("Rarity", rarityName)
 	if rainbow then
-		for _, piece in ipairs({ light, aura, glow }) do
-			CollectionService:AddTag(piece, TreasureModels.RAINBOW_TAG)
-		end
+		CollectionService:AddTag(aura, TreasureModels.RAINBOW_TAG)
 	end
 end
 

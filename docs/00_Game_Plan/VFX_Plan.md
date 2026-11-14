@@ -2,7 +2,7 @@
 
 Source: 4 KitsBlox VFX packs (particles only, no scripts). Files: `assets/VFX/*.rbxm`.
 In Studio they live in **ReplicatedStorage/VFX** with their original names.
-Code: `ReplicatedStorage/Shared/VfxPlayer` (plays them) + `ChestFxPresets` (which layers, when, how big).
+Code: `ReplicatedStorage/Shared/VfxPlayer` (plays them) + `ChestFxPresets` (which layers, when, how big), plus `StarterPlayerScripts/ChestGoldAura` for the gold aura on every chest.
 
 Look: styled after the reference picture (a cartoon dig). Each hit shows a pink-white starburst and a big yellow star, with tan rock chips and blue crystals flying. On hit 3 the chest bursts out with golden rays and glow. Opening shows a thin white light beam, cyan cubes and sparkles.
 
@@ -14,6 +14,7 @@ Look: styled after the reference picture (a cartoon dig). Each hit shows a pink-
 | Emerged chest waiting, plot chest timer running | IdleSparkle (loop) | Frost Star twinkles around the chest |
 | Timer done, ready to open | ReadyToOpen (loop) | Frost Star twinkles drawn in toward the chest + FistShotVFX_2 Shockwave1 ring pulsing from its base |
 | Open with E (Search) | ChestOpen (+ thin white light beam in ChestFx) | GlowImpact (white flash), PBlue ring, Impact356, Impact550, RedFire2 + Frost Star (rarity colour), FistShotVFX_2 Shards (cyan cubes), Frost Star (white twinkles) |
+| Every chest from emerging until it's opened (dig site, carried, on a plot) | GoldAura + GoldShimmer (ChestGoldAura) | Soft golden halo behind the chest (BillboardGui, PBlue "ring" image, pulsing in size and transparency every 1.5 s), one warm gold PointLight pulsing with it, Frost Star sparkles drifting up (gold, low rate), and a gold Highlight flash over the chest every 3–4 s |
 | Untouched mound | MoundTwinkle | Frost Star on a crystal tip every 1.5 s |
 | Mound grows back | MoundPuff | FistShotVFX_2 BALLLSLSLSL2 dust puffs |
 
@@ -23,7 +24,16 @@ Look: styled after the reference picture (a cartoon dig). Each hit shows a pink-
 - Legendary: gold
 - Secret: hot pink
 
-ChestOpen and the two loops take `RarityTint[rarity]` on every layer that doesn't set its own tint. The hit and burst effects keep their own colours: yellow star, gold rays, blue crystals. The chest's own glow (TreasureModels) uses the game's rarity colours, and Secret cycles through the rainbow.
+ChestOpen and the two loops take `RarityTint[rarity]` on every layer that doesn't set its own tint. The hit and burst effects keep their own colours: yellow star, gold rays, blue crystals. The chest's rarity aura (TreasureModels, a slow sparkle aura) uses the game's rarity colours, and Secret cycles through the rainbow. The gold aura's halo, light and shimmer are always gold, whatever the rarity.
+
+## Gold aura
+Every chest sits in a warm golden glow from the moment it emerges until it's opened. `ChestGoldAura` (a LocalScript) adds it to every model tagged `GoldAura`: the server tags carried and plot chests in `Carry.MakeTreasure`, DigClient tags the emerged dig-site chest and removes the tag when it's picked up. The aura stops when the server sets `Opening` (ChestOpen takes over) or the chest is removed.
+- **Halo:** a BillboardGui with the soft round glow image, not always on top and pushed behind the chest (`HaloBehind`), so the chest stays in front. The image is `HaloScale` (3.4) times the chest's size because the glow only fills about its middle half; the visible glow is about 1.8x the chest. The floor hides the part of the halo below the chest's base.
+- **Light:** one PointLight per chest (Color 255,200,80, Range 12), pulsing between `LightBrightness.Low` and `.Peak` with the halo. The rarity glow no longer adds its own light or glow sprite.
+- **Sparkles:** Frost Star, tinted gold, about 2.5 a second, drifting up around the chest.
+- **Shimmer:** every 3–4 s (`GoldShimmer.Interval`), a gold Highlight fades in and out over 0.4 s. It only exists during the flash, because clients can show a limited number of Highlights at once.
+- **Cost:** chests further than `CullDistance` (120 studs) from the camera switch the halo, light and sparkles off, and they come back when you're near again. Each chest's pulse starts at a random point, so chests side by side don't pulse in step.
+- Tune `ChestFxPresets.GoldAura` and `ChestFxPresets.GoldShimmer`: colours, sizes, pulse speed, rates and the cull distance.
 
 ## What the pack emitters look like
 Use this list when picking layers.

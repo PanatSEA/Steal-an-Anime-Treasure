@@ -199,6 +199,50 @@ ChestFxPresets.ReadyToOpen = {
 	} },
 }
 
+-- Gold aura (ChestGoldAura): every chest from the moment it emerges until it's opened, at the dig
+-- site, carried and on a plot. A soft golden halo behind the chest, one warm gold light pulsing
+-- with it, and slow golden sparkles drifting up. Always gold, whatever the rarity (rarity shows
+-- in IdleSparkle / ReadyToOpen / ChestOpen and the chest's rarity aura).
+local AURA_GOLD = Color3.fromRGB(255, 200, 80)
+ChestFxPresets.GoldAura = {
+	Color = AURA_GOLD, -- halo and light
+	HaloImage = "rbxassetid://109223850052778", -- soft round glow (PBlue "ring" texture)
+	-- image size, times the chest's largest dimension; the glow fills about the middle half of
+	-- the image, so 3.4 shows a glow about 1.8x the chest
+	HaloScale = 3.4,
+	HaloBrightness = 2, -- the sand is bright, so the halo needs this to read as a glow
+	HaloBehind = 0.3, -- pushed away from the camera by this times the chest size, so it stays behind it
+	PulseSeconds = 1.5, -- one full pulse (halo size, halo transparency and light together)
+	PulseSize = 0.07, -- halo size swings this fraction up and down
+	HaloTransparency = { Peak = 0.1, Low = 0.3 },
+	LightBrightness = { Peak = 1.8, Low = 1.2 },
+	LightRange = 12,
+	CullDistance = 120, -- studs from the camera; further chests switch the aura off
+	-- slow golden sparkles drifting up around the chest (a loop layer on the chest's centre)
+	Sparkles = {
+		{ template = "Frost", only = { "Star" }, size = Vector3.new(3.6, 1.2, 3), offset = Vector3.new(0, -0.4, 0), rateMul = 0.1, tint = AURA_GOLD, forceTint = true, props = {
+			EmissionDirection = Enum.NormalId.Top,
+			Speed = NumberRange.new(0.8, 1.6),
+			SpreadAngle = Vector2.new(20, 20),
+			Acceleration = Vector3.new(0, 1.2, 0),
+			Drag = 0,
+			Size = seq(0, 0, 0.3, 0.7, 1, 0),
+			Lifetime = life(1.4, 2.2),
+			Brightness = 1.5,
+		} },
+	},
+}
+
+-- Gold shimmer (ChestGoldAura): every few seconds a quick gold Highlight flash over the chest.
+ChestFxPresets.GoldShimmer = {
+	Color = Color3.fromRGB(255, 220, 110), -- fill
+	OutlineColor = Color3.fromRGB(255, 240, 170),
+	Interval = NumberRange.new(3, 4), -- seconds between flashes (random in this range per flash)
+	Seconds = 0.4, -- one flash: fade in, then out
+	FillTransparency = 0.55, -- at the flash's brightest
+	OutlineTransparency = 0.15,
+}
+
 -- Untouched mound: a twinkle on one of its blue crystals now and then (DigClient picks the crystal).
 ChestFxPresets.MoundTwinkle = {
 	{ template = "Frost", only = { "Star" }, size = POINT, countMul = 0.125, tint = false, props = {

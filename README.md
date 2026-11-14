@@ -24,7 +24,7 @@ Design specs live in the Obsidian vault in [`docs/`](docs/00_Game_Plan/Main_Inde
 | `src/ReplicatedStorage/Shared/VfxPlayer.lua` | `ReplicatedStorage.Shared.VfxPlayer` (ModuleScript, client only: plays the VFX packs) |
 | `src/ReplicatedStorage/Shared/ChestFxPresets.lua` | `ReplicatedStorage.Shared.ChestFxPresets` (ModuleScript: which pack layers play at each dig/chest moment; tune here) |
 | `assets/VFX/*.rbxm` | The four KitsBlox VFX packs, in Studio as `ReplicatedStorage.VFX.<PBlue\|FistShotVFX_2\|Frost\|SplashPuddle>` |
-| `src/StarterPlayer/StarterPlayerScripts/*.client.lua` | LocalScripts: `DigClient` (Pickaxe + dig visuals), `ChestFx` (plot chest effects, opening burst + light beam), `OwnerOnlyPrompts` |
+| `src/StarterPlayer/StarterPlayerScripts/*.client.lua` | LocalScripts: `DigClient` (Pickaxe + dig visuals), `ChestFx` (plot chest effects, opening burst + light beam), `ChestGoldAura` (gold halo, light, sparkles and shimmer on every chest tagged `GoldAura`), `OwnerOnlyPrompts` |
 | `tools/FixPickaxeTool.luau` | Run in the Studio command bar to apply the held-tool physics rules and grip to `StarterPack.Pickaxe` |
 | `tools/BuildDirtMound.luau` | Run in the Studio command bar to (re)build `ReplicatedStorage.Models.Treasures.DirtMound`: the 3-layer sand stud-block mound with ice-blue crystals from `docs/References/DirtMound_Ref.png` (never touches the chest) |
 | `tools/PrepareChestModel.luau` | Run in the Studio command bar after dropping in a new `Models.Treasures.Chest` |

@@ -17,6 +17,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 local Workspace = game:GetService("Workspace")
+local CollectionService = game:GetService("CollectionService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local AnimeConfig = require(Shared:WaitForChild("AnimeConfig"))
@@ -276,6 +277,7 @@ local function render(view)
 	end
 	if state == "Emerged" then
 		buildChest(view, 1)
+		CollectionService:AddTag(view.Chest, TreasureModels.GOLD_AURA_TAG) -- gold aura (ChestGoldAura)
 		startIdle(view)
 		return
 	end
@@ -406,6 +408,7 @@ local function playEmerge(view)
 	if rarity then
 		TreasureModels.ApplyRarityGlow(chest, rarity, true)
 	end
+	CollectionService:AddTag(chest, TreasureModels.GOLD_AURA_TAG) -- gold aura from the moment it emerges
 	local rest = chestPose(view, chest, 0, 1)
 	local top = rest + Vector3.new(0, POP_HEIGHT, 0)
 	moveChest(chest, chest:GetPivot(), top, POP_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
@@ -433,6 +436,7 @@ local function playTaken(view)
 	local chest = view.Chest
 	view.Chest = nil
 	if chest then
+		CollectionService:RemoveTag(chest, TreasureModels.GOLD_AURA_TAG) -- the carried chest has its own
 		scaleModel(chest, 0.01, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 		Debris:AddItem(chest, 0.25)
 	end
