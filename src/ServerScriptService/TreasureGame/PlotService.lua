@@ -170,10 +170,16 @@ local function addCharacterLabel(model, entry)
 	income.Parent = billboard
 end
 
-local function spawnCharacter(plot, owned)
+-- `popFrom` (the opened chest's centre) makes clients play the character popping out of the
+-- chest and landing on its slot (ChestFx); characters restored on join just stand there.
+local function spawnCharacter(plot, owned, popFrom)
 	local entry, seriesId = AnimeConfig.GetCharacter(owned.CharacterId)
 	local model = ModelLoader.Character(seriesId, entry.CharacterId)
 	addCharacterLabel(model, entry)
+	if popFrom then
+		model:SetAttribute("PopFrom", popFrom)
+		model:SetAttribute("PopAt", workspace:GetServerTimeNow())
+	end
 
 	-- Stand the model on the plot: pivot to the slot, then lift so its bottom touches the top.
 	model:PivotTo(characterCFrame(plot, owned.Slot))
@@ -297,7 +303,9 @@ openChest = function(player, chestId)
 	table.insert(data.Characters, owned)
 	refresh(plot)
 
+	local popFrom
 	if view then
+		popFrom = view.Model:GetBoundingBox().Position
 		view.Opening = true
 		view.Model:SetAttribute("Opening", true) -- clients stop the chest's loops instead of switching back to idle
 		view.Prompt:SetAttribute("Ready", false)
@@ -312,7 +320,7 @@ openChest = function(player, chestId)
 	end
 
 	if slot then
-		spawnCharacter(plot, owned)
+		spawnCharacter(plot, owned, popFrom)
 	else
 		InventoryService.Push(player)
 	end

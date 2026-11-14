@@ -28,7 +28,7 @@
 --   size         Vector3 holder-part size (loops: Shape-based emission around a chest)
 --
 -- Usage (presets live in ChestFxPresets):
---   VfxPlayer.PlayPreset(ChestFxPresets.ChestBurst, CFrame.lookAt(pos, pos + Vector3.yAxis, Vector3.zAxis))
+--   VfxPlayer.PlayPreset(ChestFxPresets.ChestBurstBase, CFrame.lookAt(pos, pos + Vector3.yAxis, Vector3.zAxis))
 --   local stop = VfxPlayer.LoopPreset(ChestFxPresets.IdleSparkle, chest.PrimaryPart, { tint = Color3.new(...) })
 --   stop()
 --   VfxPlayer.Burst("PBlue", cframe, { scale = 0.12, only = { "Impact550" }, rotation = Vector3.new(-90, 0, 0) })
@@ -37,11 +37,16 @@ local Workspace = game:GetService("Workspace")
 local Debris = game:GetService("Debris")
 local RunService = game:GetService("RunService")
 local ContentProvider = game:GetService("ContentProvider")
+local UserInputService = game:GetService("UserInputService")
 
 local VfxPlayer = {}
 
-local MAX_PER_EMITTER = 40 -- caps packs with huge EmitCounts (Frost "Debree" is 512) for mobile
-local MAX_LOOP_RATE = 40 -- particles per second per looping emitter
+-- Phones and tablets (touch, no keyboard) get half the particles: the higher rarities stack a lot of layers.
+VfxPlayer.IsMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
+local MAX_PER_EMITTER = VfxPlayer.IsMobile and 20 or 40 -- caps packs with huge EmitCounts (Frost "Debree" is 512)
+local MAX_LOOP_RATE = VfxPlayer.IsMobile and 20 or 40 -- particles per second per looping emitter
+local MOBILE_COUNT_MUL = 0.5 -- burst counts on mobile
 local MAX_DISTANCE = 300 -- bursts further than this from the camera are skipped
 local DEFAULT_EMIT_COUNT = 8
 
@@ -257,7 +262,7 @@ function VfxPlayer.Burst(templateName, where, opts)
 	holder.CFrame = rotated(cframe, opts)
 	holder.Parent = getRuntimeFolder()
 
-	local countMul = opts.countMul or 1
+	local countMul = (opts.countMul or 1) * (VfxPlayer.IsMobile and MOBILE_COUNT_MUL or 1)
 	local delayMul = opts.ignoreDelay and 0 or (opts.delayMul or 1)
 	local startDelay = opts.delay or 0
 	local longest = 0
@@ -392,12 +397,18 @@ local function safely(what, fn, ...)
 	return result
 end
 
--- Plays a preset (a list of layers) from ChestFxPresets at a world CFrame.
+-- Plays a preset (a list of layers) from ChestFxPresets at a world CFrame. Returns the holder
+-- parts it made (e.g. to slow their emitters down for a moment).
 function VfxPlayer.PlayPreset(preset, where, extraOpts)
 	extraOpts = extraOpts or {}
+	local holders = {}
 	for _, layer in preset do
-		safely("Burst " .. tostring(layer.template), VfxPlayer.Burst, layer.template, where, layerOptions(layer, extraOpts))
+		local holder = safely("Burst " .. tostring(layer.template), VfxPlayer.Burst, layer.template, where, layerOptions(layer, extraOpts))
+		if holder then
+			table.insert(holders, holder)
+		end
 	end
+	return holders
 end
 
 -- Starts a looping preset: either one layer ({ template = ... }) or a list of layers.

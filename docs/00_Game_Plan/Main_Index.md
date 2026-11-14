@@ -38,6 +38,13 @@
   - 3 layers of sand-coloured "2022 Stud" blocks (40 parts), 7 loose blocks, 3 Neon ice-blue crystal clusters, the chest's lid out of a gap in the top layer
   - Blocks carry a `DigLayer` attribute: hit 1 knocks off the top layer, hit 2 the middle, hit 3 bursts the rest; the chest rises to the mound's `ChestPose0/1/2` and pops out on hit 3
   - Flying blocks are local copies on scripted arcs (land, then fade in 1s); the server still only counts hits. The full mound grows back when the node respawns
+- **Phase 5 "Chests" (branch phase-5-chests):** one chest model per rarity at `Models/Treasures/Chests/Chest_<Rarity>` (Base + optional Trim/Gem, no lid), prepared by `tools/PrepareChests.luau`; missing rarities fall back to Chest_Common, then the old chest
+  - Opening (~0.6s): squash 1 → 1.15 → 0, ChestOpen burst, then the character pops out and lands on its plot slot. The lid animation is gone
+- **Phase 5 "Rarity FX" (branch phase-5-rarity-fx):** effects scale with rarity, all tunable in `ChestFxPresets.RarityFx` (see [[VFX_Plan]])
+  - Rarity colours match the trims (Secret is red, no rainbow); each chest's Gem glows Neon with its one light on it
+  - Glow, sparkles, sky beam (Epic 15 / Legendary 40 / Secret 80 studs), hit-3 burst, camera shake, Secret slow-motion, opening and Secret screen-edge flash per rarity
+  - The server announces Secret chests to everyone (red text in chat and a banner)
+  - Loops off beyond 150 studs (the Secret beam stays), nearest-first caps on lights and sparkle loops, half particles on mobile
   - The plot chest prompt reads **Search**; opening adds a thin white light beam
 
 ## Stage 1: Anime Series 1 (3 Bosses)

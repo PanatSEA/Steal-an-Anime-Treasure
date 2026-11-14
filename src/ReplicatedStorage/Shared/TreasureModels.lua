@@ -1,46 +1,43 @@
 -- TreasureModels: the chest and dirt mound, loaded by name (used by server and client).
---   ReplicatedStorage/Models/Treasures/Chest
---       Your own chest model (prepare it with tools/PrepareChestModel.luau): PrimaryPart
---       with its pivot at the bottom centre, front (lock side) facing -Z. An optional Model
---       "Lid" whose PrimaryPart sits on the back hinge gives a lid-opening animation;
---       without one, chests open with a burst.
+--   ReplicatedStorage/Models/Treasures/Chests/Chest_<Rarity>
+--       One chest model per rarity (Chest_Common, Chest_Epic, Chest_Legendary, Chest_Secret),
+--       prepared with tools/PrepareChests.luau: "Base" PrimaryPart with the model's pivot at the
+--       bottom centre, front (gem side) facing -Z, optional "Trim" / "Gem" parts welded to
+--       Base, 3.3 studs wide. Chests have no lid: they open with a squash and a burst (ChestFx).
+--       A missing rarity falls back to Chest_Common, then to Models/Treasures/Chest (the
+--       older single chest, if present), then to the part-built placeholder below.
 --   ReplicatedStorage/Models/Treasures/DirtMound
 --       Built by tools/BuildDirtMound.luau. PrimaryPart "Root" at ground level; parts tagged
 --       with a DigLayer attribute (1 = top) fly off layer by layer on hits; ChestPose0/1/2
 --       attributes place the chest at each stage (see the tool's header).
--- If a model is missing, a part-built placeholder is used instead (the old chest, with a lid).
--- Rarity is shown with a sparkle aura in the rarity colour, never by repainting the model. Every
--- chest also gets the gold aura (halo + light + sparkles + shimmer) on clients via GOLD_AURA_TAG.
+-- If a model is missing, a part-built placeholder is used instead.
+-- Rarity is shown by the chest model itself, its Neon Gem in the rarity colour, and the rarity
+-- aura clients add via AURA_TAG (glow, gem light, sparkles, sky beam, shimmer: ChestAura,
+-- tuned in ChestFxPresets.RarityFx). The chest is never repainted.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local CollectionService = game:GetService("CollectionService")
 
 local AnimeConfig = require(script.Parent:WaitForChild("AnimeConfig"))
+local ChestFxPresets = require(script.Parent:WaitForChild("ChestFxPresets"))
 local World = AnimeConfig.World
 
 local TreasureModels = {}
 
-TreasureModels.RAINBOW_TAG = "RainbowGlow" -- clients cycle the colour of tagged glow pieces
-TreasureModels.GLOW_NAME = "RarityGlow"
--- Chests with this tag get the gold aura on every client (ChestGoldAura): halo, light, sparkles,
--- shimmer. Carry.MakeTreasure tags carried and plot chests; DigClient tags the emerged chest.
-TreasureModels.GOLD_AURA_TAG = "GoldAura"
+-- Chests with this tag get the rarity aura on every client (ChestAura). Carry.MakeTreasure tags
+-- carried and plot chests; DigClient tags the emerged chest.
+TreasureModels.AURA_TAG = "ChestAura"
 
-local GLOW_COLORS = {
-	Common = Color3.fromRGB(255, 255, 255),
-	Epic = Color3.fromRGB(170, 80, 255),
-	Legendary = Color3.fromRGB(255, 190, 40),
-	Secret = Color3.fromRGB(255, 60, 60), -- start colour; it cycles through the rainbow
-}
-local RAINBOW = { Secret = true }
+local CHESTS_FOLDER = "Chests" -- Models/Treasures/Chests/Chest_<Rarity>
+local DEFAULT_CHEST_RARITY = "Common"
 
-local SPARKLE_TEXTURE = "rbxasset://textures/particles/sparkles_main.dds"
-
-local function source(name)
+-- A model under Models/Treasures by path, e.g. source("DirtMound") or source("Chests", "Chest_Epic").
+local function source(...)
 	local models = ReplicatedStorage:FindFirstChild(World.ModelsFolderName)
-	local folder = models and models:FindFirstChild(World.TreasureModelsFolderName)
-	local model = folder and folder:FindFirstChild(name)
-	if model and model:IsA("Model") and model.PrimaryPart then
-		return model
+	local node = models and models:FindFirstChild(World.TreasureModelsFolderName)
+	for _, name in ipairs({ ... }) do
+		node = node and node:FindFirstChild(name)
+	end
+	if node and node:IsA("Model") and node.PrimaryPart then
+		return node
 	end
 	return nil
 end
@@ -62,7 +59,7 @@ local function part(props)
 	return p
 end
 
--- The old part-built chest (wood, metal trim, gold lock, moss, hinged lid).
+-- The old part-built chest (wood, metal trim, gold lock, moss); its lid no longer opens.
 local function fallbackChest()
 	local WOOD = Color3.fromRGB(150, 95, 55)
 	local WOOD_LIGHT = Color3.fromRGB(170, 110, 62)
@@ -115,23 +112,18 @@ local function fallbackMound()
 	return model
 end
 
-function TreasureModels.Chest()
-	local found = source("Chest")
+-- The chest for a rarity (nil = not rolled yet, e.g. still buried): Chest_<Rarity>, else
+-- Chest_Common, else the older Models/Treasures/Chest, else the part-built placeholder.
+function TreasureModels.Chest(rarityName)
+	local found = (rarityName and source(CHESTS_FOLDER, "Chest_" .. rarityName))
+		or source(CHESTS_FOLDER, "Chest_" .. DEFAULT_CHEST_RARITY)
+		or source("Chest")
 	return found and found:Clone() or fallbackChest()
 end
 
 function TreasureModels.DirtMound()
 	local found = source("DirtMound")
 	return found and found:Clone() or fallbackMound()
-end
-
--- The lid model (PrimaryPart on the back hinge), or nil for single-mesh chests.
-function TreasureModels.GetLid(model)
-	local lid = model:FindFirstChild("Lid")
-	if lid and lid:IsA("Model") and lid.PrimaryPart then
-		return lid
-	end
-	return nil
 end
 
 -- Distance from the model's pivot down to its lowest point (0 when the pivot is at the bottom).
@@ -147,65 +139,21 @@ function TreasureModels.Height(model)
 	return boxSize.Y
 end
 
+-- The rarity colour (ChestFxPresets.RarityTint, matching the chests' trims).
 function TreasureModels.GlowColor(rarityName)
-	return GLOW_COLORS[rarityName] or GLOW_COLORS.Common
+	local tints = ChestFxPresets.RarityTint
+	return tints[rarityName] or tints.Common
 end
 
-function TreasureModels.IsRainbow(rarityName)
-	return RAINBOW[rarityName] == true
-end
-
--- Rainbow keypoints for particle bursts (Secret).
-function TreasureModels.RainbowSequence()
-	local points = {}
-	for i = 0, 6 do
-		table.insert(points, ColorSequenceKeypoint.new(i / 6, Color3.fromHSV(i / 6, 0.9, 1)))
-	end
-	return ColorSequence.new(points)
-end
-
--- Adds a rarity glow without touching the model's own colours: a slow sparkle aura in the
--- rarity colour (no parts, so it never affects physics). The halo and light behind the chest
--- are the gold aura (ChestGoldAura, one light per chest), the same for every rarity.
--- Secret is tagged so clients cycle it through the rainbow. `anchored` is kept for callers
--- of the old part-based halo and is no longer needed.
+-- Stamps the chest with its rarity (clients read it for the rarity aura) and lights its Gem:
+-- Neon in the rarity colour. The gem's PointLight is added by ChestAura on clients (one light
+-- per chest, culled with distance). Never repaints the chest. `anchored` is unused (kept for callers).
 function TreasureModels.ApplyRarityGlow(model, rarityName, _anchored)
-	local root = model.PrimaryPart
-	local oldGlow = model:FindFirstChild(TreasureModels.GLOW_NAME)
-	if oldGlow then
-		oldGlow:Destroy()
-	end
-	local oldAttachment = root:FindFirstChild("GlowAttachment")
-	if oldAttachment then
-		oldAttachment:Destroy()
-	end
-	if not rarityName then
-		return
-	end
-	local color = TreasureModels.GlowColor(rarityName)
-	local rainbow = TreasureModels.IsRainbow(rarityName)
-	local boxCFrame, boxSize = model:GetBoundingBox()
-
-	-- A little above the chest's centre.
-	local attachment = Instance.new("Attachment")
-	attachment.Name = "GlowAttachment"
-	attachment.Parent = root
-	attachment.WorldPosition = boxCFrame.Position + Vector3.new(0, boxSize.Y * 0.3, 0)
-
-	local aura = Instance.new("ParticleEmitter")
-	aura.Texture = SPARKLE_TEXTURE
-	aura.Color = ColorSequence.new(color)
-	aura.LightEmission = 1
-	aura.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 0) })
-	aura.Lifetime = NumberRange.new(0.8, 1.4)
-	aura.Rate = rainbow and 10 or 5
-	aura.Speed = NumberRange.new(0.5, 1.5)
-	aura.SpreadAngle = Vector2.new(180, 180)
-	aura.Parent = attachment
-
 	model:SetAttribute("Rarity", rarityName)
-	if rainbow then
-		CollectionService:AddTag(aura, TreasureModels.RAINBOW_TAG)
+	local gem = model:FindFirstChild("Gem", true)
+	if rarityName and gem and gem:IsA("BasePart") then
+		gem.Material = Enum.Material.Neon
+		gem.Color = TreasureModels.GlowColor(rarityName)
 	end
 end
 

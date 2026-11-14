@@ -3,16 +3,18 @@
 --     chests that were already there when you joined, or that stream back in, don't replay it).
 --   * IdleSparkle loop while a chest's unlock timer runs, ReadyToOpen loop once it can be opened.
 --     Loops stop when the chest is opened or removed.
---   * ChestOpen (tinted by RarityTint[rarity]) plus a thin white light beam when the server opens a
---     chest; chests with a "Lid" model also swing the lid open.
---   * Rainbow colour cycle for Secret glows.
+--   * Opening (about 0.6 s; chests have no lid): the chest squashes (scale 1 -> 1.15 -> 0 about
+--     its centre) and the rarity's opening bursts out as it collapses (RarityFx[rarity].Open,
+--     plus the thin white light beam for OpenBeam rarities and, for Secret, a brief red
+--     screen-edge flash for the chest's owner). Then the character pops out of the chest in an
+--     arc and lands on its plot slot with a dust ring. The server spawns the character when the
+--     chest is gone and stamps it with PopFrom (the chest's centre) and PopAt.
 -- Effects come from ReplicatedStorage/VFX via VfxPlayer; tune them in ChestFxPresets.
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 local Workspace = game:GetService("Workspace")
-local CollectionService = game:GetService("CollectionService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local AnimeConfig = require(Shared:WaitForChild("AnimeConfig"))
@@ -22,15 +24,22 @@ local ChestFxPresets = require(Shared:WaitForChild("ChestFxPresets"))
 
 local treasureFx = ReplicatedStorage:WaitForChild("Remote"):WaitForChild("TreasureFx")
 
-local LID_OPEN_DEGREES = 110
-local LID_OPEN_SECONDS = 0.45
-local RAINBOW_SPEED = 0.35 -- hue cycles per second
+-- Opening timeline (the server's AnimeConfig.Chest.OpenAnimationSeconds = SQUASH_GROW + SQUASH_SHRINK):
+local SQUASH_PEAK = 1.15 -- the chest swells to this scale...
+local SQUASH_GROW_SECONDS = 0.1
+local SQUASH_SHRINK_SECONDS = 0.15 -- ...then collapses to nothing; the burst plays as it collapses
+local CHARACTER_POP_SECONDS = 0.35 -- the character's arc from the chest to its slot
+local CHARACTER_POP_HEIGHT = 3 -- studs above the straight line at the top of the arc
+local CHARACTER_POP_START_SCALE = 0.2
+local CHARACTER_POP_WINDOW = 2 -- characters spawned longer ago than this (e.g. on join) don't pop
+local SCREEN_EDGE = 0.2 -- the screen-edge flash covers this fraction of the screen from each edge
 local BEAM_HEIGHT = 22
 local BEAM_SECONDS = 1.3
 local PROMPT_WAIT_SECONDS = 5
 local LAND_WINDOW_SECONDS = 2 -- chests placed less than this long ago get the landing effect
 
 local chests = {} -- [chest Model] = { state = "Idle" | "Ready" | nil, stop = fn?, opened = bool }
+local popCharacter -- defined with the opening code below
 
 local function tweenNumber(from, to, seconds, style, direction, onStep)
 	local value = Instance.new("NumberValue")
@@ -156,6 +165,8 @@ end
 plotsRoot.DescendantAdded:Connect(function(descendant)
 	if isPlotChest(descendant) then
 		task.defer(watchChest, descendant) -- deferred: let the server's layout position arrive first
+	elseif descendant:IsA("Model") and descendant:GetAttribute("PopFrom") ~= nil then
+		task.defer(popCharacter, descendant) -- a character that just came out of a chest
 	end
 end)
 
@@ -207,24 +218,73 @@ local function lightBeam(base)
 	Debris:AddItem(holder, BEAM_SECONDS + 0.2)
 end
 
-local function openLid(lid)
-	local closed = lid:GetPivot()
-	-- The lid's pivot sits on the back hinge; rotating about its X axis lifts the front.
-	tweenNumber(0, 1, LID_OPEN_SECONDS, Enum.EasingStyle.Back, Enum.EasingDirection.Out, function(alpha)
-		if lid.Parent then
-			lid:PivotTo(closed * CFrame.Angles(math.rad(LID_OPEN_DEGREES * alpha), 0, 0))
+-- Scales the chest about its centre (ScaleTo scales about the pivot, at the chest's base).
+local function squash(model)
+	local base = model:GetPivot()
+	local startScale = model:GetScale()
+	local centreOffset = base:PointToObjectSpace(chestCentre(model))
+	local function step(s)
+		if model.Parent then
+			s = math.max(s, 0.01)
+			model:ScaleTo(startScale * s)
+			model:PivotTo(base * CFrame.new(centreOffset * (1 - s)))
 		end
+	end
+	tweenNumber(1, SQUASH_PEAK, SQUASH_GROW_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, step)
+	task.delay(SQUASH_GROW_SECONDS, function()
+		tweenNumber(SQUASH_PEAK, 0, SQUASH_SHRINK_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.In, step)
 	end)
 end
 
-local function fadeOut(model, delaySeconds)
-	task.delay(delaySeconds, function()
-		for _, part in ipairs(model:GetDescendants()) do
-			if part:IsA("BasePart") and part.Transparency < 1 then
-				TweenService:Create(part, TweenInfo.new(0.3), { Transparency = 1 }):Play()
-			end
-		end
-	end)
+-- A brief coloured flash around the edges of the screen (Secret opening, owner only): four
+-- gradients fading in from the edges, in and out over `seconds`.
+local function screenEdgeFlash(settings)
+	local playerGui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+	if not playerGui then
+		return
+	end
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "ChestScreenFlash"
+	gui.IgnoreGuiInset = true
+	gui.DisplayOrder = 50
+	gui.ResetOnSpawn = false
+	local edges = {
+		{ UDim2.fromScale(1, SCREEN_EDGE), UDim2.fromScale(0, 0), 90 }, -- top: opaque at the edge
+		{ UDim2.fromScale(1, SCREEN_EDGE), UDim2.fromScale(0, 1 - SCREEN_EDGE), -90 }, -- bottom
+		{ UDim2.fromScale(SCREEN_EDGE, 1), UDim2.fromScale(0, 0), 0 }, -- left
+		{ UDim2.fromScale(SCREEN_EDGE, 1), UDim2.fromScale(1 - SCREEN_EDGE, 0), 180 }, -- right
+	}
+	local frames = {}
+	for _, edge in ipairs(edges) do
+		local frame = Instance.new("Frame")
+		frame.BorderSizePixel = 0
+		frame.BackgroundColor3 = settings.Color
+		frame.BackgroundTransparency = 1
+		frame.Size = edge[1]
+		frame.Position = edge[2]
+		local gradient = Instance.new("UIGradient")
+		gradient.Rotation = edge[3]
+		gradient.Transparency = NumberSequence.new(0, 1) -- solid at the screen edge, clear inward
+		gradient.Parent = frame
+		frame.Parent = gui
+		table.insert(frames, frame)
+	end
+	gui.Parent = playerGui
+	local half = settings.Seconds / 2
+	for _, frame in ipairs(frames) do
+		local fadeIn = TweenService:Create(frame, TweenInfo.new(half * 0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { BackgroundTransparency = settings.Transparency })
+		local fadeOut = TweenService:Create(frame, TweenInfo.new(settings.Seconds - half * 0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { BackgroundTransparency = 1 })
+		fadeIn.Completed:Connect(function()
+			fadeOut:Play()
+		end)
+		fadeIn:Play()
+	end
+	Debris:AddItem(gui, settings.Seconds + 0.1)
+end
+
+local function isMyChest(model)
+	local prompt = model:FindFirstChildWhichIsA("ProximityPrompt", true)
+	return prompt ~= nil and prompt:GetAttribute("OwnerUserId") == Players.LocalPlayer.UserId
 end
 
 local function openChest(model)
@@ -234,31 +294,56 @@ local function openChest(model)
 	end
 	setLoop(model, nil)
 
-	local lid = TreasureModels.GetLid(model)
-	if lid then
-		openLid(lid)
+	local fx = ChestFxPresets.ForRarity(model:GetAttribute("Rarity"))
+	local centre, base, tint = chestCentre(model), chestBase(model), rarityTint(model)
+	local mine = isMyChest(model)
+	squash(model)
+	task.delay(SQUASH_GROW_SECONDS, function() -- the burst comes out as the chest collapses
+		VfxPlayer.PlayPreset(fx.Open, aimUp(centre), { tint = tint })
+		if fx.OpenBeam then
+			lightBeam(base)
+		end
+		if fx.ScreenFlash and mine then
+			screenEdgeFlash(fx.ScreenFlash)
+		end
+	end)
+end
+
+-- The character that came out of a chest: it starts small at the chest's centre, arcs up and
+-- lands on its slot (where the server put it), with a dust ring on landing.
+popCharacter = function(model)
+	local from, popAt = model:GetAttribute("PopFrom"), model:GetAttribute("PopAt")
+	if typeof(from) ~= "Vector3" or typeof(popAt) ~= "number"
+		or Workspace:GetServerTimeNow() - popAt > CHARACTER_POP_WINDOW
+	then
+		return
 	end
-	VfxPlayer.PlayPreset(ChestFxPresets.ChestOpen, aimUp(chestCentre(model)), { tint = rarityTint(model) })
-	lightBeam(chestBase(model))
-	if not lid then
-		fadeOut(model, 0.15) -- single-mesh chests burst open: the chest fades into the flash
-	end
+	local target = model:GetPivot()
+	local scale = model:GetScale()
+	local boxCFrame, boxSize = model:GetBoundingBox()
+	local centreOffset = boxCFrame.Position - target.Position -- world space, at full size
+	local landing = boxCFrame.Position - Vector3.new(0, boxSize.Y / 2, 0)
+	local startPivot = from - centreOffset * CHARACTER_POP_START_SCALE -- puts its centre on the chest's
+	tweenNumber(0, 1, CHARACTER_POP_SECONDS, Enum.EasingStyle.Linear, Enum.EasingDirection.Out, function(t)
+		if not model.Parent then
+			return
+		end
+		local grow = 1 - (1 - math.min(t * 1.6, 1)) ^ 2 -- reaches full size a bit before landing
+		model:ScaleTo(scale * (CHARACTER_POP_START_SCALE + (1 - CHARACTER_POP_START_SCALE) * grow))
+		local position = startPivot:Lerp(target.Position, t) + Vector3.new(0, CHARACTER_POP_HEIGHT * 4 * t * (1 - t), 0)
+		model:PivotTo(target.Rotation + position)
+	end)
+	task.delay(CHARACTER_POP_SECONDS, function()
+		if model.Parent then
+			model:ScaleTo(scale)
+			model:PivotTo(target)
+			VfxPlayer.PlayPreset(ChestFxPresets.ChestLand, aimUp(landing))
+		end
+	end)
 end
 
 treasureFx.OnClientEvent:Connect(function(kind, model)
 	if kind == "ChestOpen" and typeof(model) == "Instance" and model:IsA("Model") and model.Parent then
 		openChest(model)
-	end
-end)
-
--- Secret glows (light, aura, glow sprite) cycle through the rainbow on every client.
-RunService.RenderStepped:Connect(function()
-	local color = Color3.fromHSV((os.clock() * RAINBOW_SPEED) % 1, 0.85, 1)
-	for _, piece in ipairs(CollectionService:GetTagged(TreasureModels.RAINBOW_TAG)) do
-		if piece:IsA("BasePart") or piece:IsA("Light") then
-			piece.Color = color
-		elseif piece:IsA("ParticleEmitter") then
-			piece.Color = ColorSequence.new(color)
-		end
 	end
 end)

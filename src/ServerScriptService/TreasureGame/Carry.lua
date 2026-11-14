@@ -1,7 +1,7 @@
 -- Carry: the treasure chest a player carries, and the chests shown on plots.
--- Uses ReplicatedStorage/Models/Treasures/Chest (see TreasureModels). Rarity is shown with
--- a sparkle aura, not by repainting the model; every chest is tagged for the gold aura
--- (halo, light, sparkles, shimmer) that clients add.
+-- Uses ReplicatedStorage/Models/Treasures/Chests/Chest_<Rarity> (see TreasureModels). Rarity is shown with
+-- its glowing gem and the chest model, never by repainting; every chest is tagged for the rarity aura
+-- (glow, gem light, sparkles, sky beam, shimmer) that clients add (ChestAura).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
 
@@ -25,13 +25,13 @@ function Carry.MakeTreasure(cfg, rarityName, opts)
 	local rarity = AnimeConfig.Rarities[rarityName]
 	local anchored = opts.Anchored == true
 
-	local model = TreasureModels.Chest()
+	local model = TreasureModels.Chest(rarityName) -- Chest_<Rarity>, falling back to Chest_Common
 	model.Name = "Treasure_" .. cfg.BossId
 	if opts.Scale and opts.Scale ~= 1 then
 		model:ScaleTo(model:GetScale() * opts.Scale)
 	end
 	TreasureModels.ApplyRarityGlow(model, rarityName, anchored)
-	CollectionService:AddTag(model, TreasureModels.GOLD_AURA_TAG)
+	CollectionService:AddTag(model, TreasureModels.AURA_TAG)
 
 	TreasureModels.SetDecorative(model, anchored)
 	local root = model.PrimaryPart

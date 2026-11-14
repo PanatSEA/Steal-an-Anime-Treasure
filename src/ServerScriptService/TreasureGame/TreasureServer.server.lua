@@ -17,6 +17,11 @@ local DigService = require(script.Parent.DigService)
 local PlayerData = require(script.Parent.PlayerData)
 local InventoryService = require(script.Parent.InventoryService)
 local PlotService = require(script.Parent.PlotService)
+local Remotes = require(script.Parent.Remotes)
+
+-- Server-wide announcements (clients show them in chat and as a banner: Announcements).
+local announce = Remotes.Event("Announce")
+local ANNOUNCED_RARITIES = { Secret = "%s found a SECRET chest!" }
 
 local World = AnimeConfig.World
 local gameFolder = Workspace:WaitForChild(World.GameFolderName)
@@ -78,6 +83,10 @@ local function completeDig(site, player)
 	player:SetAttribute("CarryingTreasure", cfg.BossId)
 	player:SetAttribute("CarryingRarity", rarity)
 	print(("[TreasureGame] %s dug up a %s %s — %s wakes up!"):format(player.Name, rarity, cfg.TreasureName, cfg.DisplayName))
+	if ANNOUNCED_RARITIES[rarity] then
+		-- The server decides and words it; clients only display it.
+		announce:FireAllClients({ Rarity = rarity, Text = ANNOUNCED_RARITIES[rarity]:format(player.DisplayName) })
+	end
 	site.Boss:Wake(player)
 
 	-- Let every client play the pop-out first, then put the chest on the digger's head.

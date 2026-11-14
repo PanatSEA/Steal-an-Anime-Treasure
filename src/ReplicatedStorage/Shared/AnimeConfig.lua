@@ -28,7 +28,7 @@ AnimeConfig.World = {
 	ModelsFolderName = "Models", -- ReplicatedStorage.Models
 	BossModelsFolderName = "Bosses", -- Models/Bosses/<BossId>
 	CharacterModelsFolderName = "Characters", -- Models/Characters/<SeriesId>/<CharacterId>
-	TreasureModelsFolderName = "Treasures", -- Models/Treasures/Chest and Models/Treasures/DirtMound
+	TreasureModelsFolderName = "Treasures", -- Models/Treasures/Chests/Chest_<Rarity> and Models/Treasures/DirtMound
 }
 
 -- Phase 4 digging with the Pickaxe. The server checks every hit; the client only plays visuals.
@@ -46,7 +46,7 @@ AnimeConfig.Dig = {
 AnimeConfig.Chest = {
 	CarryScale = 0.55, -- chest size above the carrier's head
 	PlotScale = 0.8, -- chest size on the plot
-	OpenAnimationSeconds = 1.2, -- lid opening + coin pop before the character appears
+	OpenAnimationSeconds = 0.25, -- the chest's squash (ChestFx) before the character pops out
 }
 
 AnimeConfig.Economy = {

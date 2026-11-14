@@ -3,7 +3,7 @@
 -- A lumpy 3-layer pile of sand-coloured stud blocks (same "2022 Stud" look as the tracks),
 -- loose blocks around the base, 3 glowing ice-blue crystal clusters, and a gap in the top
 -- layer where the chest corner pokes out. Styled after docs/References/DirtMound_Ref.png.
--- Safe to re-run: it replaces only DirtMound and never touches Models/Treasures/Chest.
+-- Safe to re-run: it replaces only DirtMound and never touches the chests (Models/Treasures/Chests).
 --
 -- Contract DigClient relies on:
 --   * PrimaryPart "Root" at ground level, centre of the mound. Local -Z is the front.

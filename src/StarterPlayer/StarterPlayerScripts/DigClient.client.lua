@@ -9,7 +9,8 @@
 --     and the chest pops out. The mound and flying blocks are local copies; the server only
 --     counts hits.
 --   * Effects come from ReplicatedStorage/VFX via VfxPlayer; tune them in ChestFxPresets:
---     DigHit on hits 1-2, ChestBurst (+ EmergeSoundId) on hit 3, ChestLand when the chest lands,
+--     DigHit on hits 1-2, ChestBurstBase + RarityFx[rarity].Burst (+ EmergeSoundId, the rarity's
+--     camera shake and Secret's slow-motion) on hit 3, ChestLand when the chest lands,
 --     IdleSparkle while the emerged chest waits to be picked up, MoundTwinkle/MoundPuff on mounds.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -256,9 +257,11 @@ local function buildMound(view, hits, required)
 	view.Mound = mound
 end
 
+-- The buried chest is Chest_Common (rarity isn't rolled until the last hit); once the site has a
+-- Rarity, its own Chest_<Rarity> model.
 local function buildChest(view, progress)
-	local chest = TreasureModels.Chest()
 	local rarity = view.Model:GetAttribute("Rarity")
+	local chest = TreasureModels.Chest(rarity)
 	if rarity then
 		TreasureModels.ApplyRarityGlow(chest, rarity, true)
 	end
@@ -277,7 +280,7 @@ local function render(view)
 	end
 	if state == "Emerged" then
 		buildChest(view, 1)
-		CollectionService:AddTag(view.Chest, TreasureModels.GOLD_AURA_TAG) -- gold aura (ChestGoldAura)
+		CollectionService:AddTag(view.Chest, TreasureModels.AURA_TAG) -- rarity aura (ChestAura)
 		startIdle(view)
 		return
 	end
@@ -388,45 +391,91 @@ local function playHit(view, hits, required)
 	end
 end
 
--- Hit 3: the chest bursts out, pops up and bounces down.
+-- Slows the burst's emitters to `timeScale` for `seconds` (the Secret slow-motion moment).
+local function slowDown(holders, timeScale, seconds)
+	local slowed = {}
+	for _, holder in ipairs(holders) do
+		for _, emitter in ipairs(holder:GetDescendants()) do
+			if emitter:IsA("ParticleEmitter") then
+				slowed[emitter] = emitter.TimeScale
+				emitter.TimeScale *= timeScale
+			end
+		end
+	end
+	task.delay(seconds, function()
+		for emitter, original in pairs(slowed) do
+			if emitter.Parent then
+				emitter.TimeScale = original
+			end
+		end
+	end)
+end
+
+-- Hit 3: the chest bursts out, pops up and bounces down. The burst scales with the rarity
+-- (ChestFxPresets.RarityFx): its layers on top of ChestBurstBase, the digger's camera shake, and
+-- for Secret a short slow-motion hold (the burst plays slowed, the chest and blocks wait).
 local function playEmerge(view)
 	local boss = bossConfig(view.Model)
-	local rarity = view.Model:GetAttribute("Rarity")
-	if not view.Chest then
-		buildChest(view, 2 / 3)
+	local fx = ChestFxPresets.ForRarity(view.Model:GetAttribute("Rarity"))
+	-- Swap the buried (Common) chest for the rolled rarity's model, with its glowing gem, in place.
+	local buriedPivot = view.Chest and view.Chest:GetPivot()
+	if view.Chest then
+		view.Chest:Destroy()
+		view.Chest = nil
 	end
-	VfxPlayer.PlayPreset(ChestFxPresets.ChestBurst, aimUp(view.Ground + Vector3.new(0, 0.5, 0)))
+	buildChest(view, 2 / 3)
+	if buriedPivot then
+		view.Chest:PivotTo(buriedPivot)
+	end
+	local where = aimUp(view.Ground + Vector3.new(0, 0.5, 0))
+	local holders = VfxPlayer.PlayPreset(ChestFxPresets.ChestBurstBase, where)
+	for _, holder in ipairs(VfxPlayer.PlayPreset(fx.Burst, where)) do
+		table.insert(holders, holder)
+	end
 	playSound(boss and boss.EmergeSoundId, view.Fx)
-	local mound = view.Mound
-	view.Mound = nil
-	if mound then
-		flingParts(view, layerParts(mound, nil), BURST_FLING) -- everything left bursts outward
-		mound:Destroy()
+	local hold = 0
+	if fx.SlowMo then
+		hold = fx.SlowMo.Seconds
+		slowDown(holders, fx.SlowMo.TimeScale, hold)
+	end
+	if isMine(view) then
+		shakeCamera(fx.Shake.Strength, fx.Shake.Seconds)
 	end
 
+	local mound = view.Mound
+	view.Mound = nil
 	local chest = view.Chest
-	if rarity then
-		TreasureModels.ApplyRarityGlow(chest, rarity, true)
+	CollectionService:AddTag(chest, TreasureModels.AURA_TAG) -- rarity aura from the moment it emerges
+
+	local function popOut()
+		if mound then
+			flingParts(view, layerParts(mound, nil), BURST_FLING) -- everything left bursts outward
+			mound:Destroy()
+		end
+		if view.Chest ~= chest or not chest.Parent then
+			return
+		end
+		local rest = chestPose(view, chest, 0, 1)
+		local top = rest + Vector3.new(0, POP_HEIGHT, 0)
+		moveChest(chest, chest:GetPivot(), top, POP_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		task.delay(POP_SECONDS, function()
+			moveChest(chest, top, rest, FALL_SECONDS, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out)
+		end)
+		task.delay(POP_SECONDS + FALL_SECONDS * FIRST_BOUNCE, function()
+			if view.Chest == chest and chest.Parent then
+				VfxPlayer.PlayPreset(ChestFxPresets.ChestLand, aimUp(view.Ground))
+			end
+		end)
+		task.delay(POP_SECONDS + FALL_SECONDS, function()
+			if view.Chest == chest and chest.Parent then
+				startIdle(view)
+			end
+		end)
 	end
-	CollectionService:AddTag(chest, TreasureModels.GOLD_AURA_TAG) -- gold aura from the moment it emerges
-	local rest = chestPose(view, chest, 0, 1)
-	local top = rest + Vector3.new(0, POP_HEIGHT, 0)
-	moveChest(chest, chest:GetPivot(), top, POP_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	task.delay(POP_SECONDS, function()
-		moveChest(chest, top, rest, FALL_SECONDS, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out)
-	end)
-	task.delay(POP_SECONDS + FALL_SECONDS * FIRST_BOUNCE, function()
-		if view.Chest == chest and chest.Parent then
-			VfxPlayer.PlayPreset(ChestFxPresets.ChestLand, aimUp(view.Ground))
-		end
-	end)
-	task.delay(POP_SECONDS + FALL_SECONDS, function()
-		if view.Chest == chest and chest.Parent then
-			startIdle(view)
-		end
-	end)
-	if isMine(view) then
-		shakeCamera(0.5, 0.35)
+	if hold > 0 then
+		task.delay(hold, popOut)
+	else
+		popOut()
 	end
 end
 
@@ -436,7 +485,7 @@ local function playTaken(view)
 	local chest = view.Chest
 	view.Chest = nil
 	if chest then
-		CollectionService:RemoveTag(chest, TreasureModels.GOLD_AURA_TAG) -- the carried chest has its own
+		CollectionService:RemoveTag(chest, TreasureModels.AURA_TAG) -- the carried chest has its own
 		scaleModel(chest, 0.01, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 		Debris:AddItem(chest, 0.25)
 	end
