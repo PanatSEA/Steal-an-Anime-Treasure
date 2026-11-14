@@ -1,8 +1,8 @@
 -- AudioClient: the local player's own sounds (client only; ids and volumes in AudioConfig).
 --   * UIClick: any GUI button you press (every GuiButton in PlayerGui, including ones added later)
 --   * SafeZoneEnter: the moment you step into the SAFE ZONE (not while you stay in it, not on spawn)
---   * DesertAmbience (and any AudioConfig.Ambience loop): 2D, fades in while you stand over its
---     zone (Track_01, the desert TreasureField) and fades out when you leave
+--   * DesertAmbience (and any AudioConfig.Ambience loop): 2D, loops on its own all session and
+--     fades in while you stand over its zone (Track_01, the desert TreasureField), out when you leave
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -68,7 +68,9 @@ local function zonePart(path)
 	return node and node:IsA("BasePart") and node or nil
 end
 
--- One looping 2D sound per ambience, faded in and out (the Sound stays, paused when silent).
+-- One looping 2D sound per ambience. It is started once and then loops on its own for the whole
+-- session (Looped = true; never stopped, paused or replayed, so a seamless file stays seamless);
+-- entering or leaving its zone only fades its Volume between 0 and its AudioConfig volume.
 local ambience = {} -- [key] = { Sound, On, Tween }
 local function setAmbience(key, on)
 	local entry = ambience[key]
@@ -78,8 +80,7 @@ local function setAmbience(key, on)
 			ambience[key] = { On = false }
 			return
 		end
-		sound.Volume = 0
-		sound:Pause()
+		sound.Volume = 0 -- running silently until you are in the zone
 		entry = { Sound = sound, On = false }
 		ambience[key] = entry
 	end
@@ -92,15 +93,7 @@ local function setAmbience(key, on)
 	if entry.Tween then
 		entry.Tween:Cancel()
 	end
-	if on and not entry.Sound.IsPlaying then
-		entry.Sound:Resume()
-	end
 	entry.Tween = TweenService:Create(entry.Sound, TweenInfo.new(settings.FadeSeconds), { Volume = target })
-	entry.Tween.Completed:Connect(function(state)
-		if state == Enum.PlaybackState.Completed and not entry.On then
-			entry.Sound:Pause()
-		end
-	end)
 	entry.Tween:Play()
 end
 

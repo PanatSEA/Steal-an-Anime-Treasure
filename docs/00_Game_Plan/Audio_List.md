@@ -40,7 +40,7 @@ Style for every prompt: *cartoon game sound effect, clean, punchy, no music, no 
 | CashTick       | Income added           | 0.2s     | rbxassetid://121758541053378 | "tiny cartoon coin clink, very short, game UI sound"                               |
 | SafeZoneEnter  | Enter safe zone        | 0.5s     | rbxassetid://134919952997653 | "calm soft shield chime, relief, short, game sound effect"                         |
 | UIClick        | Buttons                | 0.1s     | rbxassetid://95740396502829  | "soft cartoon UI button click, short pop"                                          |
-| DesertAmbience | Background on Track_01 | 30s loop | rbxassetid://131963591216655 | "light desert wind ambience with distant sand blowing, calm, seamless loop"        |
+| DesertAmbience | Background on Track_01 | 30s loop | rbxassetid://97079056272611  | "light desert wind ambience with distant sand blowing, calm, seamless loop"        |
 
 ## Carry loops (chest on your head, by rarity)
 

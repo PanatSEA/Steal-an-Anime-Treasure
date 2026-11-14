@@ -55,7 +55,7 @@ AudioConfig.Sounds = {
 	CashTick = { Id = "rbxassetid://121758541053378", Volume = 0.3, RollOff = NEAR }, -- coin, once when a character lands on your plot (not on income)
 	SafeZoneEnter = { Id = "rbxassetid://134919952997653", Volume = 0.5 }, -- 2D, you step into the SAFE ZONE
 	UIClick = { Id = "rbxassetid://95740396502829", Volume = 0.3 }, -- 2D, any GUI button
-	DesertAmbience = { Id = "rbxassetid://131963591216655", Volume = 2.5 }, -- 2D loop on Track_01; this file peaks at 11, so 2.5 sounds like a normal sound at about 0.15 (use 0.15 with a normal-loudness file)
+	DesertAmbience = { Id = "rbxassetid://97079056272611", Volume = 0.15 }, -- 2D, 30s seamless loop on Track_01 (AudioClient keeps it looping and only fades its volume)
 
 	-- Carry loops: on the chest on a carrier's head, by rarity (TreasureServer). 3D, so nearby players
 	-- hear it too; RollOff Max is how far it carries.
