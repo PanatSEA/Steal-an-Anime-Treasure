@@ -42,7 +42,18 @@ Style for every prompt: *cartoon game sound effect, clean, punchy, no music, no 
 | UIClick        | Buttons                | 0.1s     | rbxassetid://95740396502829  | "soft cartoon UI button click, short pop"                                          |
 | DesertAmbience | Background on Track_01 | 30s loop | rbxassetid://131963591216655 | "light desert wind ambience with distant sand blowing, calm, seamless loop"        |
 
+## Carry loops (chest on your head, by rarity)
+
+| Key             | When it plays              | Length    | SoundId                      | File (assets/SFX)       |
+| --------------- | -------------------------- | --------- | ---------------------------- | ----------------------- |
+| Carry_Common    | Carrying a Common chest    | 1.7s loop | rbxassetid://95132538649866  | SFX_Carry_Common.ogg    |
+| Carry_Epic      | Carrying an Epic chest     | 1.7s loop | rbxassetid://109004894928009 | SFX_Carry_Epic.ogg      |
+| Carry_Legendary | Carrying a Legendary chest | 1.7s loop | rbxassetid://129565902405958 | SFX_Carry_Legendary.ogg |
+| Carry_Secret    | Carrying a Secret chest    | 1.7s loop | rbxassetid://96978809939891  | SFX_Carry_Secret.ogg    |
+
+New DigHit (SFX_DigHit.mp3, "One powerful human b..."): replace the DigHit SoundId in Priority 1 after uploading.
+
 ## Volume guide
 - Big moments (Emerge, Open_Legendary/Secret, SkillHit): 0.6–0.8
 - Frequent sounds (DigHit, CashTick, UIClick): 0.3–0.4
-- Loops (BeamHum, DesertAmbience): 0.15–0.25
+- Loops (BeamHum, DesertAmbience, Carry_*): 0.15–0.25

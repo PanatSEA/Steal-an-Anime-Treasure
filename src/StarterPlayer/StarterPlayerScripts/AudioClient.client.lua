@@ -1,5 +1,4 @@
 -- AudioClient: the local player's own sounds (client only; ids and volumes in AudioConfig).
---   * CashTick: when your Cash goes up (income), at most once per AudioConfig.CashTickMinSeconds
 --   * UIClick: any GUI button you press (every GuiButton in PlayerGui, including ones added later)
 --   * SafeZoneEnter: the moment you step into the SAFE ZONE (not while you stay in it, not on spawn)
 --   * DesertAmbience (and any AudioConfig.Ambience loop): 2D, fades in while you stand over its
@@ -16,27 +15,6 @@ local AudioConfig = require(Shared:WaitForChild("AudioConfig"))
 local World = AnimeConfig.World
 local localPlayer = Players.LocalPlayer
 local ZONE_CHECK_SECONDS = 0.25
-
--- CashTick ------------------------------------------------------------------------
-
-local lastCashTick = 0
-local function watchCash(cash)
-	local previous = cash.Value
-	cash.Changed:Connect(function(value)
-		local now = os.clock()
-		if value > previous and now - lastCashTick >= AudioConfig.CashTickMinSeconds then
-			lastCashTick = now
-			AudioConfig.Play("CashTick")
-		end
-		previous = value
-	end)
-end
-
-task.spawn(function()
-	local leaderstats = localPlayer:WaitForChild("leaderstats")
-	local cash = leaderstats:FindFirstChild("Cash") or leaderstats:WaitForChild("Cash")
-	watchCash(cash)
-end)
 
 -- UIClick -------------------------------------------------------------------------
 

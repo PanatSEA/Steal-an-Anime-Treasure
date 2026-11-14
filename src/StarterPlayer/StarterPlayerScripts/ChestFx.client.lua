@@ -10,7 +10,8 @@
 --     arc and lands on its plot slot with a dust ring. The server spawns the character when the
 --     chest is gone and stamps it with PopFrom (the chest's centre) and PopAt.
 -- Effects come from ReplicatedStorage/VFX via VfxPlayer; tune them in ChestFxPresets. Sounds come from
--- AudioConfig (3D at the chest): ChestLand, Open_<Rarity>, CharacterAppear.
+-- AudioConfig (3D at the chest): ChestLand, Open_<Rarity>, CharacterAppear, then the CashTick coin
+-- (once per new character; income itself is silent).
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -344,6 +345,9 @@ popCharacter = function(model)
 			model:PivotTo(target)
 			VfxPlayer.PlayPreset(ChestFxPresets.ChestLand, aimUp(landing))
 			AudioConfig.Play("CharacterAppear", landing)
+			task.delay(AudioConfig.CoinDelaySeconds, function()
+				AudioConfig.Play("CashTick", landing) -- the coin: a new earner on your plot
+			end)
 		end
 	end)
 end

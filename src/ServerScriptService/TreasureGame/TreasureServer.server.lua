@@ -59,6 +59,10 @@ local function releaseTreasure(player, reason, knockedOff)
 	carrying[player] = nil
 	player:SetAttribute("CarryingTreasure", nil)
 	player:SetAttribute("CarryingRarity", nil)
+	if entry.CarryLoop then
+		AudioConfig.FadeOut(entry.CarryLoop, AudioConfig.CarryFadeSeconds) -- dropped, banked, died or left
+		entry.CarryLoop = nil
+	end
 	if entry.Part then
 		if knockedOff then
 			AudioConfig.Play("ChestDrop", entry.Part:GetPivot().Position) -- 3D, everyone nearby hears it
@@ -106,11 +110,33 @@ local function startCarrying(site, player, rarity)
 	return entry
 end
 
--- Puts the carried chest model on the player's head.
+-- Carry_<Rarity>: a looped 3D sound on the carried chest, so nearby players hear it too. One per
+-- chest: a second call (e.g. a repeated pickup) finds the first one and does nothing.
+local function startCarryLoop(entry)
+	local root = entry.Part and entry.Part.PrimaryPart
+	if not root or entry.CarryLoop then
+		return
+	end
+	local key = "Carry_" .. tostring(entry.Rarity)
+	if not AudioConfig.Sounds[key] then
+		key = "Carry_Common"
+	end
+	if root:FindFirstChild("Sfx_" .. key) then
+		return
+	end
+	local sound = AudioConfig.Play(key, root, { Looped = true })
+	if sound then
+		AudioConfig.FadeIn(sound, AudioConfig.CarryFadeSeconds)
+		entry.CarryLoop = sound
+	end
+end
+
+-- Puts the carried chest model on the player's head, with its carry loop.
 local function attachTreasure(player, entry)
 	local treasure = Carry.MakeTreasure(entry.Site.Config, entry.Rarity, { Scale = AnimeConfig.Chest.CarryScale })
 	if player.Character and Carry.AttachToCharacter(player.Character, treasure) then
 		entry.Part = treasure
+		startCarryLoop(entry)
 	else
 		treasure:Destroy()
 	end
