@@ -6,7 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local AnimeConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("AnimeConfig"))
 local Zones = require(script.Parent.Zones)
 local SkillPatterns = require(script.Parent.SkillPatterns)
-local Sfx = require(script.Parent.Sfx)
+local AudioConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("AudioConfig"))
 local ModelLoader = require(script.Parent.ModelLoader)
 
 local BossController = {}
@@ -108,7 +108,7 @@ function BossController:Wake(player)
 	self:_setState("Chasing")
 	self.Root.Anchored = false
 	self.Root:SetNetworkOwner(nil)
-	Sfx.Play(self.Config.WakeUpSoundId, self.Root)
+	AudioConfig.Play("WakeUpSoundId", self.Root) -- 3D, follows the boss
 	task.spawn(function()
 		self:_chaseLoop()
 	end)

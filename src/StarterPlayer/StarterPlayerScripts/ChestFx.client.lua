@@ -9,7 +9,8 @@
 --     screen-edge flash for the chest's owner). Then the character pops out of the chest in an
 --     arc and lands on its plot slot with a dust ring. The server spawns the character when the
 --     chest is gone and stamps it with PopFrom (the chest's centre) and PopAt.
--- Effects come from ReplicatedStorage/VFX via VfxPlayer; tune them in ChestFxPresets.
+-- Effects come from ReplicatedStorage/VFX via VfxPlayer; tune them in ChestFxPresets. Sounds come from
+-- AudioConfig (3D at the chest): ChestLand, Open_<Rarity>, CharacterAppear.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -21,6 +22,7 @@ local AnimeConfig = require(Shared:WaitForChild("AnimeConfig"))
 local TreasureModels = require(Shared:WaitForChild("TreasureModels"))
 local VfxPlayer = require(Shared:WaitForChild("VfxPlayer"))
 local ChestFxPresets = require(Shared:WaitForChild("ChestFxPresets"))
+local AudioConfig = require(Shared:WaitForChild("AudioConfig"))
 
 local treasureFx = ReplicatedStorage:WaitForChild("Remote"):WaitForChild("TreasureFx")
 
@@ -128,6 +130,7 @@ local function watchChest(model)
 
 	if justPlaced(model) then
 		VfxPlayer.PlayPreset(ChestFxPresets.ChestLand, aimUp(chestBase(model)))
+		AudioConfig.Play("ChestLand", chestBase(model))
 	end
 
 	local prompt = findPrompt(model)
@@ -297,6 +300,8 @@ local function openChest(model)
 	local fx = ChestFxPresets.ForRarity(model:GetAttribute("Rarity"))
 	local centre, base, tint = chestCentre(model), chestBase(model), rarityTint(model)
 	local mine = isMyChest(model)
+	local openSound = "Open_" .. tostring(model:GetAttribute("Rarity")) -- Open_Common .. Open_Secret
+	AudioConfig.Play(AudioConfig.Sounds[openSound] and openSound or "Open_Common", centre)
 	squash(model)
 	task.delay(SQUASH_GROW_SECONDS, function() -- the burst comes out as the chest collapses
 		VfxPlayer.PlayPreset(fx.Open, aimUp(centre), { tint = tint })
@@ -338,6 +343,7 @@ popCharacter = function(model)
 			model:ScaleTo(scale)
 			model:PivotTo(target)
 			VfxPlayer.PlayPreset(ChestFxPresets.ChestLand, aimUp(landing))
+			AudioConfig.Play("CharacterAppear", landing)
 		end
 	end)
 end

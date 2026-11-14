@@ -1,13 +1,15 @@
 -- Announcements: server-wide messages (client, display only). The server decides and words them
 -- (TreasureServer fires Remote.Announce, e.g. "[Player] found a SECRET chest!"); this shows each
 -- one in the chat as a system message and as a banner at the top of the screen, in the rarity's
--- colour (ChestFxPresets.RarityFx[rarity].Announce.Color; red for Secret).
+-- colour (ChestFxPresets.RarityFx[rarity].Announce.Color; red for Secret), with the server's sound
+-- (e.g. SecretAnnounce) as a 2D sound, the same loudness for every player wherever they are.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TextChatService = game:GetService("TextChatService")
 local TweenService = game:GetService("TweenService")
 
 local ChestFxPresets = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("ChestFxPresets"))
+local AudioConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("AudioConfig"))
 local announce = ReplicatedStorage:WaitForChild("Remote"):WaitForChild("Announce")
 
 local BANNER_SECONDS = 4 -- on screen, including the fades
@@ -79,4 +81,7 @@ announce.OnClientEvent:Connect(function(message)
 	local color = (fx and fx.Announce and fx.Announce.Color) or DEFAULT_COLOR
 	showInChat(message.Text, color)
 	showBanner(message.Text, color)
+	if type(message.Sound) == "string" and AudioConfig.Sounds[message.Sound] then
+		AudioConfig.Play(message.Sound) -- no position: 2D
+	end
 end)

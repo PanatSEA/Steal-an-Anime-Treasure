@@ -18,7 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local AnimeConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("AnimeConfig"))
 local Zones = require(script.Parent.Zones)
-local Sfx = require(script.Parent.Sfx)
+local AudioConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("AudioConfig"))
 
 local SkillPatterns = {}
 
@@ -72,7 +72,7 @@ local function circleStrike(ctx, center)
 	fill.Parent = telegraph
 	telegraph.Parent = ctx.EffectsFolder
 
-	Sfx.Play(cfg.TelegraphSoundId, ring)
+	AudioConfig.Play("TelegraphSoundId", center) -- 3D at the circle (a spot, so the strike can remove the ring)
 	TweenService:Create(fill, TweenInfo.new(warning, Enum.EasingStyle.Linear), {
 		Size = Vector3.new(0.2, diameter, diameter),
 	}):Play()
@@ -81,7 +81,7 @@ local function circleStrike(ctx, center)
 	-- Strike
 	fill.Color = STRIKE_FLASH_COLOR
 	fill.Transparency = 0
-	Sfx.Play(cfg.SkillHitSoundId, ring)
+	AudioConfig.Play("SkillHitSoundId", center)
 
 	for _, player in ipairs(Players:GetPlayers()) do
 		local character = player.Character

@@ -156,11 +156,8 @@ AnimeConfig.Bosses = {
 		BossModelName = "TBD", -- TODO: real boss model (loads Models/Bosses/Boss_01; grey-box until then)
 		TreasureModelName = "TBD", -- TODO: real treasure model (gold block until then)
 		TelegraphColor = "Red",
-		HitSoundId = "rbxassetid://0", -- TODO(asset): pickaxe hit sound
-		EmergeSoundId = "rbxassetid://125649136159228", -- ElevenLabs "Ice magic spell hit" (~2s), plays on the 3rd hit
-		WakeUpSoundId = "rbxassetid://0", -- TODO: boss wake-up roar
-		TelegraphSoundId = "rbxassetid://0", -- TODO: telegraph warning sound
-		SkillHitSoundId = "rbxassetid://0", -- TODO: skill impact sound
+		-- Sounds (dig hit, emerge, wake-up, telegraph, skill hit) live in ReplicatedStorage.Shared.AudioConfig,
+		-- keyed as in docs/00_Game_Plan/Audio_List.md (DigHit, EmergeSoundId, WakeUpSoundId, ...).
 		SkillVFXName = "TBD", -- TODO: skill strike VFX
 
 		-- 5. Chest Opening

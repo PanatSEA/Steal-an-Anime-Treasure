@@ -19,7 +19,8 @@ Design specs live in the Obsidian vault in [`docs/`](docs/00_Game_Plan/Main_Inde
 | --- | --- |
 | `src/ReplicatedStorage/Shared/AnimeConfig.lua` | `ReplicatedStorage.Shared.AnimeConfig` (ModuleScript) |
 | `src/ServerScriptService/TreasureGame/TreasureServer.server.lua` | `ServerScriptService.TreasureGame.TreasureServer` (Script) |
-| `src/ServerScriptService/TreasureGame/*.lua` | ModuleScripts beside it: `BossController`, `SkillPatterns`, `DigService`, `HeldPhysics`, `PlotService`, `PlayerData`, `InventoryService`, `Roll`, `ModelLoader`, `Carry`, `Remotes`, `Zones`, `Sfx` |
+| `src/ServerScriptService/TreasureGame/*.lua` | ModuleScripts beside it: `BossController`, `SkillPatterns`, `DigService`, `HeldPhysics`, `PlotService`, `PlayerData`, `InventoryService`, `Roll`, `ModelLoader`, `Carry`, `Remotes`, `Zones` |
+| `src/ReplicatedStorage/Shared/AudioConfig.lua` | `ReplicatedStorage.Shared.AudioConfig` (ModuleScript, server + client: every sound id and volume, keyed as in `docs/00_Game_Plan/Audio_List.md`, and `AudioConfig.Play` for 3D / 2D one-shots and loops). Source files: `assets/SFX/SFX_<Key>.mp3` |
 | `src/ReplicatedStorage/Shared/TreasureModels.lua` | `ReplicatedStorage.Shared.TreasureModels` (ModuleScript, server + client) |
 | `src/ReplicatedStorage/Shared/VfxPlayer.lua` | `ReplicatedStorage.Shared.VfxPlayer` (ModuleScript, client only: plays the VFX packs) |
 | `src/ReplicatedStorage/Shared/ChestFxPresets.lua` | `ReplicatedStorage.Shared.ChestFxPresets` (ModuleScript: which pack layers play at each dig/chest moment, and `RarityFx`, every rarity's glow, beam, burst and opening; tune here) |

@@ -14,6 +14,8 @@
 --     DigHit on hits 1-2, ChestBurstBase + RarityFx[rarity].Burst (+ EmergeSoundId, the rarity's
 --     camera shake and Secret's slow-motion) on hit 3, ChestLand when the chest lands,
 --     IdleSparkle while the emerged chest waits to be picked up, MoundTwinkle/MoundPuff on mounds.
+--   * Sounds come from AudioConfig (3D at the mound/chest): DigHit, EmergeSoundId, ChestLand,
+--     PickupHold (loops while you hold E on the chest), PickupDone.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -27,6 +29,7 @@ local AnimeConfig = require(Shared:WaitForChild("AnimeConfig"))
 local TreasureModels = require(Shared:WaitForChild("TreasureModels"))
 local VfxPlayer = require(Shared:WaitForChild("VfxPlayer"))
 local ChestFxPresets = require(Shared:WaitForChild("ChestFxPresets"))
+local AudioConfig = require(Shared:WaitForChild("AudioConfig"))
 
 local Dig = AnimeConfig.Dig
 local World = AnimeConfig.World
@@ -65,17 +68,6 @@ local function tweenNumber(from, to, seconds, style, direction, onStep)
 	onStep(from)
 	tween:Play()
 	return tween
-end
-
-local function playSound(soundId, parent)
-	if AnimeConfig.IsPlaceholderAsset(soundId) then
-		return -- TODO(asset): sound not made yet
-	end
-	local sound = Instance.new("Sound")
-	sound.SoundId = soundId
-	sound.Parent = parent
-	sound:Play()
-	Debris:AddItem(sound, 5)
 end
 
 local function shakeCamera(strength, seconds)
@@ -136,10 +128,6 @@ local function chestPose(view, chest, gone, progress)
 	return CFrame.new(view.Ground + Vector3.new(0, rest - depth * (1 - progress), 0))
 		* FACING
 		* CFrame.Angles(math.rad(BURIED_TILT.X * tilt), 0, math.rad(BURIED_TILT.Y * tilt))
-end
-
-local function bossConfig(model)
-	return AnimeConfig.Bosses[model:GetAttribute("BossId")]
 end
 
 local function rarityTint(view)
@@ -377,8 +365,9 @@ end
 
 -- Hits before the last: the top remaining layer flies off and the chest rises.
 local function playHit(view, hits, required)
-	local boss = bossConfig(view.Model)
-	VfxPlayer.PlayPreset(ChestFxPresets.DigHit, impactCFrame(view))
+	local impact = impactCFrame(view)
+	VfxPlayer.PlayPreset(ChestFxPresets.DigHit, impact)
+	AudioConfig.Play("DigHit", impact.Position)
 	if view.Mound then
 		view.Gone = layersGone(hits, required, view.Layers)
 		flingParts(view, layerParts(view.Mound, view.Gone), HIT_FLING)
@@ -387,7 +376,6 @@ local function playHit(view, hits, required)
 		moveChest(view.Chest, view.Chest:GetPivot(), chestPose(view, view.Chest, view.Gone or 0, hits / required), 0.35,
 			Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 	end
-	playSound(boss and boss.HitSoundId, view.Fx)
 	if isMine(view) then
 		shakeCamera(0.35, 0.25)
 	end
@@ -417,7 +405,6 @@ end
 -- (ChestFxPresets.RarityFx): its layers on top of ChestBurstBase, the digger's camera shake, and
 -- for Secret a short slow-motion hold (the burst plays slowed, the chest and blocks wait).
 local function playEmerge(view)
-	local boss = bossConfig(view.Model)
 	local fx = ChestFxPresets.ForRarity(view.Model:GetAttribute("Rarity"))
 	-- Swap the buried (Common) chest for the rolled rarity's model, with its glowing gem, in place.
 	local buriedPivot = view.Chest and view.Chest:GetPivot()
@@ -434,7 +421,7 @@ local function playEmerge(view)
 	for _, holder in ipairs(VfxPlayer.PlayPreset(fx.Burst, where)) do
 		table.insert(holders, holder)
 	end
-	playSound(boss and boss.EmergeSoundId, view.Fx)
+	AudioConfig.Play("EmergeSoundId", view.Fx)
 	local hold = 0
 	if fx.SlowMo then
 		hold = fx.SlowMo.Seconds
@@ -466,6 +453,7 @@ local function playEmerge(view)
 		task.delay(POP_SECONDS + FALL_SECONDS * FIRST_BOUNCE, function()
 			if view.Chest == chest and chest.Parent then
 				VfxPlayer.PlayPreset(ChestFxPresets.ChestLand, aimUp(view.Ground))
+				AudioConfig.Play("ChestLand", view.Ground)
 			end
 		end)
 		task.delay(POP_SECONDS + FALL_SECONDS, function()
@@ -487,6 +475,7 @@ local function playTaken(view)
 	local chest = view.Chest
 	view.Chest = nil
 	if chest then
+		AudioConfig.Play("PickupDone", (chest:GetBoundingBox()).Position)
 		CollectionService:RemoveTag(chest, TreasureModels.AURA_TAG) -- the carried chest has its own
 		scaleModel(chest, 0.01, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 		Debris:AddItem(chest, 0.25)
@@ -654,6 +643,33 @@ local function addSite(model)
 		end
 	end)
 	sync(view)
+
+	-- PickupHold: loops at the chest while this player holds E on the server's "Pick up" prompt, and
+	-- stops when they let go, finish the hold or the prompt goes away.
+	local prompt = anchor:WaitForChild("PickupPrompt", 30)
+	if prompt then
+		local holdSound
+		local function stopHold()
+			if holdSound then
+				holdSound:Destroy()
+				holdSound = nil
+			end
+		end
+		prompt.PromptButtonHoldBegan:Connect(function(player)
+			if player == localPlayer then
+				stopHold()
+				holdSound = AudioConfig.Play("PickupHold", anchor, { Looped = true })
+			end
+		end)
+		prompt.PromptButtonHoldEnded:Connect(function(player)
+			if player == localPlayer then
+				stopHold()
+			end
+		end)
+		prompt.Triggered:Connect(stopHold)
+		prompt:GetPropertyChangedSignal("Enabled"):Connect(stopHold)
+		prompt.Destroying:Connect(stopHold)
+	end
 end
 
 for _, model in ipairs(digSites:GetChildren()) do

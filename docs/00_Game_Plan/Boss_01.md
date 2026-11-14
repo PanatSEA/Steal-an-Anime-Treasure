@@ -30,11 +30,7 @@
 - BossModelName: "TBD"
 - TreasureModelName: "TBD" (loads ReplicatedStorage/Models/Treasures/Chest)
 - TelegraphColor: "Red"
-- HitSoundId: "rbxassetid://0"
-- EmergeSoundId: "rbxassetid://125649136159228" (ElevenLabs "Ice magic spell hit", ~2s)
-- WakeUpSoundId: "rbxassetid://0"
-- TelegraphSoundId: "rbxassetid://0"
-- SkillHitSoundId: "rbxassetid://0"
+- Sounds: see [[Audio_List]] (keys DigHit, EmergeSoundId, WakeUpSoundId, TelegraphSoundId, SkillHitSoundId, ...). The ids live in code in `ReplicatedStorage.Shared.AudioConfig`.
 - SkillVFXName: "TBD"
 
 ## 5. Chest Opening

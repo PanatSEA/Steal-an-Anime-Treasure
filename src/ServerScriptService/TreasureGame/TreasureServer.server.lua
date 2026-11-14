@@ -21,6 +21,7 @@ local PlayerData = require(script.Parent.PlayerData)
 local InventoryService = require(script.Parent.InventoryService)
 local PlotService = require(script.Parent.PlotService)
 local Remotes = require(script.Parent.Remotes)
+local AudioConfig = require(ReplicatedStorage.Shared:WaitForChild("AudioConfig"))
 
 -- Server-wide announcements (clients show them in chat and as a banner: Announcements).
 local announce = Remotes.Event("Announce")
@@ -49,7 +50,8 @@ PlotService.Init()
 PlotService.Start()
 PlayerData.StartAutosave()
 
-local function releaseTreasure(player, reason)
+-- `knockedOff` = the carrier lost it (hit by the boss, died): play ChestDrop where it was.
+local function releaseTreasure(player, reason, knockedOff)
 	local entry = carrying[player]
 	if not entry then
 		return
@@ -58,6 +60,9 @@ local function releaseTreasure(player, reason)
 	player:SetAttribute("CarryingTreasure", nil)
 	player:SetAttribute("CarryingRarity", nil)
 	if entry.Part then
+		if knockedOff then
+			AudioConfig.Play("ChestDrop", entry.Part:GetPivot().Position) -- 3D, everyone nearby hears it
+		end
 		entry.Part:Destroy()
 	end
 	print(("[TreasureGame] %s %s: %s [%s]"):format(player.Name, reason, entry.Site.Config.TreasureName, entry.Rarity))
@@ -159,7 +164,7 @@ local function completeDig(site, player)
 	site.Available = false
 	if ANNOUNCED_RARITIES[rarity] then
 		-- The server decides and words it; clients only display it.
-		announce:FireAllClients({ Rarity = rarity, Text = ANNOUNCED_RARITIES[rarity]:format(player.DisplayName) })
+		announce:FireAllClients({ Rarity = rarity, Text = ANNOUNCED_RARITIES[rarity]:format(player.DisplayName), Sound = "SecretAnnounce" })
 	end
 
 	if cfg.TriggerCondition == "OnChestPickedUp" then
@@ -223,7 +228,7 @@ local function setupSite(model)
 		OnPlayerHit = function(player)
 			local entry = carrying[player]
 			if cfg.DropTreasureOnHit and entry and entry.Site == site then
-				releaseTreasure(player, "dropped (hit by boss)")
+				releaseTreasure(player, "dropped (hit by boss)", true)
 			end
 		end,
 		OnSleep = function()
@@ -241,7 +246,7 @@ digSitesFolder.ChildAdded:Connect(setupSite)
 local function onCharacterAdded(player, character)
 	local humanoid = character:WaitForChild("Humanoid")
 	humanoid.Died:Connect(function()
-		releaseTreasure(player, "dropped (died)")
+		releaseTreasure(player, "dropped (died)", true)
 	end)
 end
 
