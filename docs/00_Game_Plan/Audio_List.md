@@ -10,7 +10,7 @@ Style for every prompt: *cartoon game sound effect, clean, punchy, no music, no 
 
 | Key              | When it plays              | Length  | SoundId                      | ElevenLabs prompt                                                                                                |
 | ---------------- | -------------------------- | ------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| DigHit           | Pickaxe hits 1–2           | 0.3s    | rbxassetid://79276780678315  | "short cartoon pickaxe hitting packed sand and stone, crunchy thud with a small crystal tink, game sound effect" |
+| DigHit           | Pickaxe hits 1–2           | 0.3s    | rbxassetid://130123394294904 | "short cartoon pickaxe hitting packed sand and stone, crunchy thud with a small crystal tink, game sound effect" |
 | EmergeSoundId    | Hit 3, chest bursts out    | 2s      | rbxassetid://125649136159228 | ✅ done (Ice magic spell hit)                                                                                     |
 | ChestLand        | Chest lands on the sand    | 0.4s    | rbxassetid://91242421295360  | "heavy wooden treasure chest dropping onto sand, soft thump with a metal clank, cartoon game sound"              |
 | PickupHold       | While holding E (loops 1s) | 1s loop | rbxassetid://99639233150105  | "rising magical charge-up whoosh, short, building tension, cartoon game sound effect"                            |

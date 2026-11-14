@@ -31,7 +31,7 @@ local FAR = { Min = 12, Max = 160 } -- boss sounds carry further
 
 AudioConfig.Sounds = {
 	-- Priority 1: the core loop
-	DigHit = { Id = "rbxassetid://79276780678315", Volume = 0.35, PitchRange = { 0.95, 1.05 }, RollOff = NEAR }, -- pickaxe hits 1-2
+	DigHit = { Id = "rbxassetid://130123394294904", Volume = 0.35, StartAt = 0.3, PitchRange = { 0.95, 1.05 }, RollOff = NEAR }, -- pickaxe hits 1-2
 	EmergeSoundId = { Id = "rbxassetid://125649136159228", Volume = 0.7, RollOff = NEAR }, -- hit 3, chest bursts out
 	ChestLand = { Id = "rbxassetid://91242421295360", Volume = 0.5, StartAt = 0.25, RollOff = NEAR }, -- chest lands (dig site, plot)
 	PickupHold = { Id = "rbxassetid://99639233150105", Volume = 0.4, RollOff = NEAR }, -- loops while holding E on the chest
